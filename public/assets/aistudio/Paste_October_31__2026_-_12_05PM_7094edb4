@@ -1,0 +1,956 @@
+# MASTER BUILD PROMPT — LEDGERCHAT
+
+## Project overview
+
+Build a complete, modern, mobile-first financial management and business intelligence web application called **LedgerChat**.
+
+Tagline: **Your conversations. Your business. One clear picture.**
+
+LedgerChat is an AI-powered financial management platform designed for small businesses, informal merchants, WhatsApp vendors, retailers, wholesalers, fashion businesses, electronics dealers and independent service providers across Nigeria and Africa.
+
+The platform transforms unstructured business conversations into organized financial records, transaction histories, customer insights, product analytics and business performance reports.
+
+The target audience consists of ordinary business owners, many of whom have little or no accounting or technical knowledge.
+
+The application must therefore be extremely intuitive. A person who understands WhatsApp and how to receive bank transfers should be able to navigate the application without needing technical training.
+
+Do not build this as a generic admin dashboard. Build it as a polished, commercially credible financial product.
+
+---
+
+# 1. TECHNOLOGY AND ARCHITECTURE
+
+Use the following architecture:
+
+### Frontend
+- React.
+- TypeScript.
+- Tailwind CSS.
+- Lucide icons.
+- Recharts for analytics.
+- Responsive component architecture.
+
+### Backend
+- Node.js server-side runtime.
+- TypeScript.
+- Google Gen AI SDK (`@google/genai`).
+- Secure file-processing endpoints.
+- Validation and reconciliation services.
+
+### AI
+Use Gemma 4 through the Gemini API.
+
+Preferred model:
+`gemma-4-26b-a4b-it`
+
+Keep the model name configurable on the server so it can be changed without modifying the frontend.
+
+Use the model for:
+- WhatsApp conversation interpretation.
+- Transaction extraction.
+- Customer identification.
+- Product identification.
+- Order and payment classification.
+- Payment receipt image interpretation.
+- Matching supporting evidence to transactions.
+- Business summaries and insights.
+
+Use structured JSON responses where supported. Validate every AI response against application schemas before saving it.
+
+Never expose the Gemini API key in frontend code.
+
+### Database and authentication
+Use Firebase Authentication and Cloud Firestore for persistent user accounts and business records.
+
+Ask for the necessary Firebase integration and provisioning through Google AI Studio.
+
+Implement:
+- User registration.
+- Login.
+- Logout.
+- Protected application routes.
+- Business profile.
+- Persistent transaction records.
+- Customer records.
+- Product records.
+- Import history.
+- Evidence records.
+- User preferences.
+
+All records must be associated with the authenticated user and business. Implement Firestore security rules that prevent one business from accessing another business's information.
+
+If Firebase cannot be provisioned automatically, create a clean database adapter and a functional local development mode without pretending that local records are cloud-persistent.
+
+---
+
+# 2. BRAND IDENTITY AND VISUAL DESIGN
+
+Create a premium, elegant and trustworthy fintech design.
+
+### Brand personality
+
+LedgerChat should feel:
+- Trustworthy.
+- Simple.
+- Intelligent.
+- Approachable.
+- Modern.
+- Professional.
+- African-market friendly.
+
+### Colour palette
+
+Use:
+
+- Primary forest green: #145C42
+- Deep green: #103E30
+- Light green: #E8F4ED
+- Background: #F7F9F7
+- White: #FFFFFF
+- Primary text: #19251F
+- Secondary text: #718078
+- Success: #168653
+- Warning: #E9A23B
+- Error: #D94C4C
+
+Use green as the dominant brand colour, not as an overwhelming background.
+
+### UI requirements
+
+- Clean typography.
+- Rounded cards with subtle borders.
+- Soft shadows.
+- Consistent spacing.
+- Beautiful charts.
+- Intuitive icons.
+- Clear visual hierarchy.
+- Smooth but restrained transitions.
+- Attractive empty states.
+- Loading skeletons.
+- Helpful tooltips.
+- Responsive tables.
+- Beautiful mobile navigation.
+
+Avoid excessive gradients, glassmorphism, oversized headings, excessive animation and cluttered layouts.
+
+Do not make the interface look like an AI-generated template.
+
+---
+
+# 3. APPLICATION STRUCTURE
+
+Create the following main sections:
+
+1. Overview
+2. Transactions
+3. Customers
+4. Products
+5. Business Insights
+6. Conversations
+7. Reports
+8. Settings
+
+On desktop, use a collapsible left sidebar.
+
+On mobile, use a clean bottom navigation with access to the most important sections and a More menu for the remaining sections.
+
+Include a top navigation bar with:
+- LedgerChat logo.
+- Business name.
+- Current reporting period.
+- Notifications.
+- User profile.
+
+---
+
+# 4. ONBOARDING EXPERIENCE
+
+Create a simple onboarding flow.
+
+### Screen 1: Welcome
+
+Heading:
+
+"Welcome to LedgerChat."
+
+Subheading:
+
+"Understand your business without spending hours recording transactions."
+
+Explain in simple language that LedgerChat helps organize business conversations into sales records and useful business information.
+
+### Screen 2: Business details
+
+Collect:
+- Business name.
+- Business category.
+- Owner's name.
+- Country.
+- Currency.
+
+Default country: Nigeria.
+
+Default currency: Nigerian Naira (₦).
+
+### Screen 3: Reporting preferences
+
+Ask:
+
+"How often would you like to organize your business records?"
+
+Options:
+- Every week.
+- Every two weeks.
+- Every month.
+
+Allow the user to choose a preferred reminder day and time.
+
+### Screen 4: Connect business records
+
+Explain:
+
+"LedgerChat works with supported WhatsApp conversation exports. You can share your exported conversations and available attachments with us. We will organize the business information for you."
+
+Provide simple instructions and a clear import button.
+
+Never claim to have connected directly to WhatsApp or accessed private WhatsApp backups.
+
+---
+
+# 5. MAIN DASHBOARD — OVERVIEW
+
+This is the most important screen.
+
+Design it to resemble a premium banking application.
+
+### Welcome section
+
+Display:
+
+"Good morning, [Business Owner]."
+
+Subheading:
+
+"Here's how your business is doing."
+
+Include a reporting period selector:
+- Today.
+- This week.
+- This month.
+- This year.
+- Custom period.
+
+### Financial summary cards
+
+Create cards for:
+
+**Total Sales**
+
+The total value of qualifying sales within the selected period.
+
+**Money Received**
+
+The amount supported as received or confirmed through the available verification process.
+
+**Money Owed to You**
+
+The outstanding balances customers still need to pay.
+
+**Transactions**
+
+The number of recorded transactions within the period.
+
+Each card should have a short explanation in ordinary language.
+
+Do not confuse total order value with money received.
+
+### Revenue chart
+
+Create an attractive interactive line or area chart showing business sales and payments received over time.
+
+Allow weekly, monthly and yearly views.
+
+### Recent transactions
+
+Display the latest transactions with:
+
+- Customer.
+- Product.
+- Amount.
+- Date.
+- Payment status.
+- View details action.
+
+### Business highlights
+
+Create an intelligent insights panel displaying observations such as:
+
+- "You made more sales this week than last week."
+- "Chidi is your highest-spending customer this month."
+- "Phone accessories are your most popular products."
+- "You have three customers with outstanding payments."
+
+Generate these observations from actual stored data. Never invent metrics.
+
+### Best-performing customers
+
+Show the top three customers based on recognized completed sales.
+
+### Best-selling products
+
+Show the top three products based on confirmed fulfilled sales and units sold.
+
+---
+
+# 6. TRANSACTION MANAGEMENT
+
+Create a complete transaction management interface.
+
+### Transactions page
+
+Include:
+- Search bar.
+- Date filters.
+- Customer filter.
+- Product filter.
+- Payment status filter.
+- Transaction type filter.
+
+Display transactions in a clean table on desktop and responsive cards on mobile.
+
+Each transaction should display:
+
+- Transaction ID.
+- Customer name.
+- Product or service.
+- Quantity.
+- Total agreed price.
+- Amount received.
+- Outstanding balance.
+- Date.
+- Transaction status.
+- Evidence status.
+- View details.
+
+### Transaction statuses
+
+Use clearly distinguished statuses:
+
+- Order received.
+- Awaiting payment.
+- Partially paid.
+- Payment claimed.
+- Evidence submitted.
+- Merchant confirmed.
+- Completed.
+- Cancelled.
+- Refunded.
+- Needs review.
+
+Do not treat every payment message as proof of a completed transaction.
+
+### Transaction detail drawer
+
+When a user selects a transaction, open a beautiful detail panel containing:
+
+1. Customer information.
+2. Product and quantity.
+3. Agreed transaction amount.
+4. Amount received.
+5. Outstanding amount.
+6. Transaction timeline.
+7. Payment information.
+8. Supporting WhatsApp messages.
+9. Supporting receipt images.
+10. Verification status.
+11. Merchant review controls.
+
+### Proof of payment
+
+Every transaction must have an evidence section.
+
+Create a prominent "View Proof" action.
+
+When clicked, open a modal showing:
+
+- Original relevant WhatsApp message.
+- Customer conversation context.
+- Uploaded or imported payment screenshot.
+- Extracted amount.
+- Transaction reference, if available.
+- Date and time.
+- Evidence matching result.
+- Verification explanation.
+
+Clearly distinguish between:
+- Customer claims to have paid.
+- Payment receipt image supplied.
+- Bank notification contained in the imported records.
+- Merchant-confirmed receipt.
+- Independently verified bank receipt, only where an authorized payment integration supports it.
+
+Never display a green "Verified" badge simply because Gemma believes a screenshot looks genuine.
+
+If the evidence is incomplete, show "Needs review".
+
+Allow merchants to confirm, reject or flag a transaction.
+
+---
+
+# 7. CUSTOMER INTELLIGENCE
+
+Create a dedicated Customers page.
+
+Display:
+
+- Total customers.
+- Returning customers.
+- Highest-value customers.
+- Customers with outstanding balances.
+- Most frequent customers.
+
+Each customer should have a detailed profile.
+
+### Customer profile
+
+Include:
+
+- Customer name or identifier.
+- Contact information, if available.
+- Total purchases.
+- Amount paid.
+- Outstanding balance.
+- Number of orders.
+- First transaction.
+- Most recent transaction.
+- Purchase history.
+- Related conversations.
+- Payment history.
+
+### Customer rankings
+
+Create rankings for:
+
+- Highest total spending.
+- Most frequent purchases.
+- Highest outstanding balance.
+- Most active customers.
+
+Use simple labels such as:
+
+"Your biggest customer this month."
+
+"Customers who buy from you most often."
+
+Avoid complicated terms such as customer lifetime value unless accompanied by a simple explanation.
+
+---
+
+# 8. PRODUCT INTELLIGENCE
+
+Create a Products page.
+
+The system should identify products from business conversations and transaction records.
+
+Display:
+
+- Total identified products.
+- Best-selling product.
+- Most requested product.
+- Products generating the highest sales.
+- Products with declining sales.
+
+Each product should have:
+
+- Product name.
+- Number of units sold.
+- Total sales value.
+- Number of orders.
+- Average selling price.
+- Sales trend.
+- Related transactions.
+
+Important:
+
+Distinguish between products customers merely enquire about, products they order and products successfully sold.
+
+Only qualifying completed sales should count towards best-selling product calculations.
+
+---
+
+# 9. BUSINESS INSIGHTS
+
+Build a beautiful Business Insights page.
+
+The page should explain business performance in simple language.
+
+Include:
+
+### Sales performance
+- Daily sales.
+- Weekly sales.
+- Monthly sales.
+- Yearly sales.
+- Revenue trends.
+- Sales comparisons.
+
+### Customer performance
+- Best customers.
+- Returning customer percentage.
+- Customer purchasing patterns.
+- Customers with unpaid balances.
+
+### Product performance
+- Best-selling products.
+- Most requested products.
+- Highest revenue-generating products.
+- Product sales trends.
+
+### Payment performance
+- Money received.
+- Outstanding balances.
+- Partially paid orders.
+- Transactions awaiting review.
+
+### Business observations
+
+Generate AI-powered summaries using the stored financial records.
+
+Example:
+
+"Your sales increased by 18% this month compared with last month."
+
+"Your most popular product this month was iPhone chargers, with 24 confirmed units sold."
+
+"Three customers currently owe you a combined ₦45,000."
+
+Always calculate numerical metrics using application logic, not AI-generated guesses.
+
+Only generate insights when sufficient data exists.
+
+---
+
+# 10. WHATSAPP CONVERSATION IMPORT
+
+This is one of the most important functional features.
+
+Create an attractive page called "Import Business Conversations".
+
+The user should be able to upload:
+
+- WhatsApp exported `.txt` files.
+- ZIP archives containing exported chat text and media.
+- Individual JPG, JPEG, PNG and supported image files.
+
+Support multiple files in one import session.
+
+Use a suitable archive extraction library for ZIP files.
+
+Validate file types and sizes. Handle unsupported or malformed files gracefully.
+
+### Import interface
+
+Show a large upload area with the text:
+
+"Bring your business conversations together."
+
+"Upload your WhatsApp chat exports and available payment receipts. LedgerChat will organize the information for you."
+
+Provide:
+- Choose files button.
+- Drag-and-drop support.
+- Selected file list.
+- Remove file option.
+- Import button.
+
+### Simple instructions
+
+Include a beginner-friendly guide:
+
+"How to get your WhatsApp chat"
+
+1. Open WhatsApp.
+2. Open the business conversation you want to save.
+3. Tap the three dots or contact name.
+4. Select More or Chat options.
+5. Choose Export Chat.
+6. Select Include Media when available.
+7. Share or save the exported files.
+8. Return to LedgerChat and upload them.
+
+Explain that standard WhatsApp exports may be limited to individual conversations. Do not claim that one export automatically contains every conversation.
+
+### Import processing screen
+
+After the user uploads files, show a clear progress interface:
+
+- Reading your conversations.
+- Identifying business activities.
+- Finding orders and payments.
+- Examining payment evidence.
+- Organizing customer records.
+- Preparing your business summary.
+
+Use progress indicators that reflect actual processing states. Do not fake completed AI analysis.
+
+### Import results
+
+When processing finishes, show:
+
+- Number of conversations processed.
+- Business activities identified.
+- Transactions extracted.
+- Customers identified.
+- Products identified.
+- Payment evidence found.
+- Records requiring review.
+
+Provide a button:
+
+"Review My Business Records"
+
+Then allow the user to review and save the extracted information.
+
+### Incremental imports
+
+Support repeated imports.
+
+Do not create duplicate transactions when a merchant imports overlapping chat histories.
+
+Use message identifiers where available and conservative matching based on dates, customers, amounts and source context.
+
+Flag uncertain duplicate matches for review instead of silently deleting records.
+
+Never delete previously confirmed records merely because they are missing from a newer import.
+
+---
+
+# 11. GEMMA 4 PROCESSING ENGINE
+
+Implement the actual AI processing functionality.
+
+Create a server-side AI service using `@google/genai`.
+
+Use the configured Gemma 4 model to process conversation text and relevant receipt images.
+
+### Extraction responsibilities
+
+Extract:
+
+- Customer identifiers.
+- Customer names.
+- Product names.
+- Quantities.
+- Negotiated prices.
+- Order values.
+- Amounts paid.
+- Outstanding balances.
+- Dates.
+- Transaction references.
+- Payment claims.
+- Payment evidence.
+- Refunds.
+- Cancellations.
+- Delivery information.
+
+### Contextual understanding
+
+The model must understand that a conversation can contain several stages of a transaction.
+
+Example:
+
+Customer: "I need two phone screens."
+
+Merchant: "One is ₦35,000."
+
+Customer: "Okay, I want two."
+
+Merchant: "Total is ₦70,000."
+
+Customer: "I have sent ₦40,000. I will balance tomorrow."
+
+The system should extract:
+
+- Product: Phone screen.
+- Quantity: 2.
+- Agreed order value: ₦70,000.
+- Amount reportedly paid: ₦40,000.
+- Outstanding balance: ₦30,000.
+- Status: Partially paid.
+- Payment confirmation: Claimed, pending independent confirmation.
+
+Do not count the same order as several different sales because the customer discussed it in several messages.
+
+### AI output
+
+Use a predictable transaction schema.
+
+Example:
+
+{
+  "customerName": "Chidi",
+  "productName": "Phone Screen",
+  "quantity": 2,
+  "agreedAmount": 70000,
+  "amountPaid": 40000,
+  "outstandingAmount": 30000,
+  "currency": "NGN",
+  "transactionStatus": "partially_paid",
+  "paymentClaimStatus": "customer_claimed",
+  "evidence": [],
+  "sourceMessages": [],
+  "confidence": 0.94,
+  "requiresReview": false
+}
+
+This is an illustrative schema. Implement proper TypeScript types and validation.
+
+### AI reliability rules
+
+- Never invent missing transaction amounts.
+- Never assume that every number represents money.
+- Distinguish phone numbers, dates, quantities and prices.
+- Recognize Nigerian currency expressions such as 5k, 10k, 2.5m and ₦50,000.
+- Recognize informal English and Nigerian Pidgin.
+- Preserve the original message as evidence.
+- Flag ambiguous transactions.
+- Identify possible duplicate transactions.
+- Never convert a payment promise into a confirmed payment.
+- Never claim independent bank verification without an authorized verification source.
+
+Process large conversation imports in manageable batches while retaining enough conversation context to understand transactions.
+
+---
+
+# 12. CONVERSATION HISTORY
+
+Create a Conversations page that allows the merchant to search imported business conversations.
+
+Include:
+
+- Search by customer.
+- Search by keyword.
+- Date filtering.
+- Conversation previews.
+- Related transaction links.
+- Evidence attachments.
+
+When the merchant opens a conversation, show the relevant messages in a familiar chat-style layout.
+
+Do not make it a replacement for WhatsApp.
+
+Its purpose is to help merchants retrieve business discussions supporting their financial records.
+
+---
+
+# 13. REPORTS AND EXPORTS
+
+Create a Reports section.
+
+Allow users to generate:
+
+- Weekly business reports.
+- Bi-weekly business reports.
+- Monthly business reports.
+- Annual business reports.
+- Custom-period reports.
+
+Include:
+- Total sales.
+- Money received.
+- Outstanding payments.
+- Transaction count.
+- Best customers.
+- Best-selling products.
+- Revenue trends.
+- Important business observations.
+
+Provide working PDF and Excel export functionality.
+
+Reports should look professional and include the business name and reporting period.
+
+Never include unverified transactions in confirmed revenue totals.
+
+---
+
+# 14. SETTINGS
+
+Create a simple settings page.
+
+Include:
+
+### Business profile
+Edit business name, category and currency.
+
+### Reporting preferences
+Set reconciliation frequency and reminder preferences.
+
+### Account security
+Change password and manage account sessions.
+
+### Privacy and data
+View imported records, delete imported files and request deletion of business records.
+
+### Notifications
+Manage business summaries and outstanding payment reminders.
+
+### Language
+Initially support English, with a structure that can accommodate Nigerian Pidgin, Yoruba, Igbo and Hausa in future versions.
+
+---
+
+# 15. DATA MODE AND DEMONSTRATION EXPERIENCE
+
+The application must be demonstrable even before real merchants upload their conversations.
+
+Create a clearly labelled **Explore Demo Business** mode.
+
+Use a fictional Nigerian electronics business with realistic sample data.
+
+Suggested business:
+
+Chidi Electronics.
+
+Use realistic sample customers, products, transactions, dates and payment evidence.
+
+Populate the demo with:
+- At least 20 transactions.
+- At least 8 customers.
+- At least 8 products.
+- Full payments.
+- Partial payments.
+- Outstanding balances.
+- Pending orders.
+- Several payment evidence records.
+- Different transaction dates across several weeks.
+
+Provide enough data to make the dashboard, customer rankings, product analytics and charts meaningful.
+
+Use fictional receipts and fictional conversation records.
+
+Clearly label the environment as demonstration data.
+
+Allow the user to reset the demo.
+
+Ensure all dashboard cards, filters, charts, transaction drawers and analytics work with the demonstration data.
+
+Do not mix demonstration records with a real merchant's records.
+
+---
+
+# 16. FUNCTIONALITY REQUIREMENTS
+
+This is not just a UI design exercise.
+
+Every major interaction must work.
+
+Implement:
+
+- Authentication.
+- Persistent user sessions.
+- Business onboarding.
+- File upload.
+- ZIP extraction.
+- WhatsApp text parsing.
+- Gemma 4 integration.
+- Image processing.
+- Structured transaction extraction.
+- Transaction validation.
+- Evidence viewing.
+- Merchant review.
+- Customer management.
+- Product management.
+- Search and filters.
+- Analytics.
+- Reporting.
+- PDF and Excel exports.
+- Settings.
+- Demo mode.
+
+Use proper loading states, success messages, empty states and error handling.
+
+Never use non-functional buttons.
+
+Never use fabricated AI responses when a real AI request is expected.
+
+If the AI service is unavailable, display an understandable error and allow the user to retry.
+
+---
+
+# 17. PRIVACY AND SECURITY
+
+Treat WhatsApp conversations and financial records as sensitive business information.
+
+Implement:
+- Explicit consent before processing.
+- Server-side AI API calls.
+- Secure file validation.
+- User-specific database access.
+- Firestore security rules.
+- No public exposure of uploaded records.
+- Secure handling of temporary files.
+- Clear deletion mechanisms.
+- Minimal collection of unrelated personal information.
+
+Do not implement WhatsApp Web scraping, hidden background monitoring, unauthorized access to encrypted WhatsApp backups or simulated WhatsApp authentication.
+
+The MVP uses supported file imports.
+
+Future direct integrations must use authorized APIs and permissions.
+
+---
+
+# 18. IMPLEMENTATION ORDER
+
+Build the application in the following order:
+
+1. Establish the project structure and application architecture.
+2. Implement authentication and onboarding.
+3. Implement the visual design system and responsive navigation.
+4. Build the overview dashboard.
+5. Build transaction management and transaction details.
+6. Build customers and products.
+7. Build conversation import and file processing.
+8. Integrate Gemma 4 on the server.
+9. Implement transaction validation and evidence matching.
+10. Build business analytics.
+11. Build reports and exports.
+12. Implement settings and privacy controls.
+13. Implement demonstration mode.
+14. Test all routes, interactions and responsive layouts.
+15. Resolve build errors and verify the entire application.
+
+Do not stop after generating the dashboard.
+
+Do not replace backend functionality with static frontend data.
+
+Where a real external integration requires credentials or permissions, create the necessary integration structure and clearly identify what remains to be configured.
+
+---
+
+# 19. FINAL QUALITY STANDARD
+
+Before considering the implementation complete, verify the following:
+
+- A user can create an account and log in.
+- A user can complete business onboarding.
+- The dashboard displays persistent business information.
+- A user can import a WhatsApp conversation export.
+- The application can extract relevant transaction information.
+- Gemma 4 is actually called from the backend.
+- Extracted transactions are validated before saving.
+- Payment evidence can be opened from individual transactions.
+- Uncertain transactions can be reviewed.
+- Customer and product analytics are calculated from stored records.
+- Reporting periods work correctly.
+- Reports can be exported.
+- The application works on mobile and desktop.
+- The interface is understandable without accounting knowledge.
+- No demo information is mistaken for real financial information.
+- No major button or navigation item is non-functional.
+
+**The final result should feel like a real financial product that a small business owner in Lagos could comfortably use every day.**
+
+Build LedgerChat with exceptional attention to design, usability, functionality, accuracy and trust.
+
+Start implementing the complete application now. Do not merely explain how you would build it. Generate the application, its components, its backend, its database integration and its working user experience.

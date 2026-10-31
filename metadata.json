@@ -1,0 +1,6 @@
+{
+  "name": "LedgerChat",
+  "description": "Your conversations. Your business. One clear picture. AI-powered financial management and business intelligence for WhatsApp merchants and small businesses.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
