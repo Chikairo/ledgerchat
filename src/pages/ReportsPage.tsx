@@ -37,14 +37,18 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
   const reportTransactions = useMemo(() => {
     return transactions.filter((tx) => {
       const txDate = new Date(tx.date);
+      if (isNaN(txDate.getTime())) return false;
+
       if (reportType === 'weekly') {
-        const d = new Date();
+        const d = new Date(now);
         d.setDate(now.getDate() - 7);
+        d.setHours(0, 0, 0, 0);
         return txDate >= d;
       }
       if (reportType === 'biweekly') {
-        const d = new Date();
+        const d = new Date(now);
         d.setDate(now.getDate() - 14);
+        d.setHours(0, 0, 0, 0);
         return txDate >= d;
       }
       if (reportType === 'monthly') {
@@ -55,7 +59,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
       }
       return true; // custom / all
     });
-  }, [transactions, reportType]);
+  }, [transactions, reportType, now]);
 
   // Aggregated figures
   const metrics = useMemo(() => {
@@ -138,9 +142,9 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
       {/* Title & Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-extrabold text-[#19251F] tracking-tight">Financial Reports</h1>
+          <h1 className="text-2xl font-extrabold text-[#19251F] tracking-tight">Business Statements & Reports</h1>
           <p className="text-xs text-[#718078] mt-0.5">
-            Generate and export official reconciled accounting statements for banks, partners, and tax records.
+            Download Excel spreadsheets or print PDF statements for your bank, loan applications, or business records.
           </p>
         </div>
 
@@ -150,7 +154,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-[#145C42]" />
-            Export Excel (CSV)
+            Download Excel (CSV)
           </button>
           <button
             onClick={handlePrint}
@@ -162,14 +166,14 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
         </div>
       </div>
 
-      {/* Period Selection Tabs */}
+      {/* Period Selection Tabs in plain language */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
         {[
-          { id: 'weekly', label: 'Weekly Summary' },
-          { id: 'biweekly', label: 'Bi-Weekly Report' },
-          { id: 'monthly', label: 'Monthly Statement' },
-          { id: 'annual', label: 'Annual Reconciliation' },
-          { id: 'custom', label: 'Full Historical' },
+          { id: 'weekly', label: 'Last 7 Days (Weekly)' },
+          { id: 'biweekly', label: 'Last 14 Days' },
+          { id: 'monthly', label: 'This Month' },
+          { id: 'annual', label: 'This Year' },
+          { id: 'custom', label: 'All Records' },
         ].map((tab) => (
           <button
             key={tab.id}

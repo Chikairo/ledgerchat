@@ -16,6 +16,7 @@ import {
   Coins,
   ArrowRight,
   Calendar,
+  Eye,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -29,6 +30,7 @@ import {
   Bar,
 } from 'recharts';
 import { BusinessProfile, Transaction, Customer, Product, BusinessObservation } from '../types';
+import { LiveEmptyState } from '../components/LiveEmptyState';
 
 interface OverviewPageProps {
   profile: BusinessProfile;
@@ -36,6 +38,7 @@ interface OverviewPageProps {
   customers: Customer[];
   products: Product[];
   selectedPeriod: string;
+  onPeriodChange?: (period: string) => void;
   onSelectTransaction: (transaction: Transaction) => void;
   onNavigate: (page: string) => void;
   onOpenProofModal: (transaction: Transaction) => void;
@@ -47,27 +50,37 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
   customers,
   products,
   selectedPeriod,
+  onPeriodChange,
   onSelectTransaction,
   onNavigate,
   onOpenProofModal,
 }) => {
   const [chartView, setChartView] = useState<'weekly' | 'monthly' | 'yearly'>('weekly');
 
-  // Filter transactions by selected period
+  // Filter transactions by selected period with robust day boundaries
   const filteredTransactions = useMemo(() => {
     const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
     return transactions.filter((tx) => {
       const txDate = new Date(tx.date);
+      if (isNaN(txDate.getTime())) return false;
+
       if (selectedPeriod === 'today') {
-        return txDate.toDateString() === now.toDateString();
+        return txDate >= startOfToday && txDate <= endOfToday;
       }
       if (selectedPeriod === 'this_week') {
-        const weekAgo = new Date();
+        const weekAgo = new Date(now);
         weekAgo.setDate(now.getDate() - 7);
+        weekAgo.setHours(0, 0, 0, 0);
         return txDate >= weekAgo;
       }
       if (selectedPeriod === 'this_month') {
-        return txDate.getMonth() === now.getMonth() && txDate.getFullYear() === now.getFullYear();
+        return (
+          txDate.getMonth() === now.getMonth() &&
+          txDate.getFullYear() === now.getFullYear()
+        );
       }
       if (selectedPeriod === 'this_year') {
         return txDate.getFullYear() === now.getFullYear();
@@ -76,16 +89,71 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
     });
   }, [transactions, selectedPeriod]);
 
-  // Financial Summary Computations (Strict separation between sales & cash received)
+  // Period stats and all-time figures for quick switching
+  const periodStats = useMemo(() => {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const weekAgo = new Date(now);
+    weekAgo.setDate(now.getDate() - 7);
+    weekAgo.setHours(0, 0, 0, 0);
+
+    let todayCount = 0;
+    let weekCount = 0;
+    let monthCount = 0;
+    let yearCount = 0;
+    let allTimeSales = 0;
+
+    transactions.forEach((tx) => {
+      const d = new Date(tx.date);
+      if (isNaN(d.getTime())) return;
+      if (tx.status !== 'cancelled' && tx.status !== 'refunded') {
+        allTimeSales += tx.agreedAmount || 0;
+      }
+      if (d >= startOfToday && d <= endOfToday) todayCount++;
+      if (d >= weekAgo) weekCount++;
+      if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) monthCount++;
+      if (d.getFullYear() === now.getFullYear()) yearCount++;
+    });
+
+    return {
+      today: todayCount,
+      this_week: weekCount,
+      this_month: monthCount,
+      this_year: yearCount,
+      all_time: transactions.length,
+      allTimeSales,
+    };
+  }, [transactions]);
+
+  // Financial Summary Computations (Strict separation between sales & verified cash received)
   const financialSummary = useMemo(() => {
     let totalSales = 0;
     let moneyReceived = 0;
+    let unconfirmedClaims = 0;
     let moneyOwed = 0;
 
     filteredTransactions.forEach((tx) => {
-      if (tx.status !== 'cancelled') {
+      // Exclude cancelled and refunded orders from active sales totals
+      if (tx.status !== 'cancelled' && tx.status !== 'refunded') {
         totalSales += tx.agreedAmount || 0;
-        moneyReceived += tx.amountPaid || 0;
+
+        // CRITICAL ACCOUNTING RULE:
+        // A customer's claim of payment is NEVER classified as independently confirmed money received!
+        // Only merchant-confirmed or completed transactions count as verified money received.
+        const isMerchantVerified =
+          tx.status === 'completed' ||
+          tx.status === 'merchant_confirmed' ||
+          tx.paymentClaimStatus === 'merchant_confirmed' ||
+          tx.paymentClaimStatus === 'independently_verified';
+
+        if (isMerchantVerified) {
+          moneyReceived += tx.amountPaid || 0;
+        } else if (tx.amountPaid > 0) {
+          // Unverified customer claim (e.g. "I don send am", screenshot submitted but unverified)
+          unconfirmedClaims += tx.amountPaid;
+        }
+
         moneyOwed += tx.outstandingAmount || 0;
       }
     });
@@ -93,6 +161,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
     return {
       totalSales,
       moneyReceived,
+      unconfirmedClaims,
       moneyOwed,
       txCount: filteredTransactions.length,
     };
@@ -142,20 +211,20 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
   const dynamicObservations = useMemo(() => {
     const obs: string[] = [];
     if (topCustomers.length > 0) {
-      obs.push(`${topCustomers[0].name} is your highest-spending customer with ₦${topCustomers[0].totalSpent.toLocaleString()} paid.`);
+      obs.push(`⭐ Top Customer: ${topCustomers[0].name} has bought the most goods, paying ₦${topCustomers[0].totalSpent.toLocaleString()} so far.`);
     }
     if (topProducts.length > 0) {
-      obs.push(`${topProducts[0].name} is your most popular product (${topProducts[0].unitsSold} confirmed units sold).`);
+      obs.push(`🔥 Fastest Selling: ${topProducts[0].name} is your top product with ${topProducts[0].unitsSold} confirmed sales.`);
     }
     const debtors = customers.filter((c) => c.outstandingBalance > 0);
     if (debtors.length > 0) {
-      obs.push(`You have ${debtors.length} customer${debtors.length > 1 ? 's' : ''} with outstanding balances totaling ₦${financialSummary.moneyOwed.toLocaleString()}.`);
+      obs.push(`⚠️ Money to Collect: ${debtors.length} customer${debtors.length > 1 ? 's owe' : ' owes'} you ₦${financialSummary.moneyOwed.toLocaleString()} in unpaid balances.`);
     } else {
-      obs.push('All customer balances are currently settled with zero outstanding debts.');
+      obs.push('✅ All Good: None of your customers are owing you money at the moment.');
     }
-    if (financialSummary.moneyReceived > 0) {
-      const collectionRate = Math.round((financialSummary.moneyReceived / (financialSummary.totalSales || 1)) * 100);
-      obs.push(`Your payment collection efficiency is ${collectionRate}% for the selected period.`);
+    if (financialSummary.moneyReceived > 0 && financialSummary.totalSales > 0) {
+      const collectionRate = Math.round((financialSummary.moneyReceived / financialSummary.totalSales) * 100);
+      obs.push(`💰 Cash Collected: You have collected ${collectionRate}% of agreed sales. ₦${financialSummary.moneyOwed.toLocaleString()} is remaining to collect.`);
     }
     return obs;
   }, [topCustomers, topProducts, customers, financialSummary]);
@@ -166,34 +235,59 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
       .slice(0, 5);
   }, [filteredTransactions]);
 
-  const getStatusBadge = (status: Transaction['status']) => {
-    switch (status) {
-      case 'completed':
-        return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#168653] bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-            <CheckCircle2 className="w-3 h-3" /> Confirmed Paid
-          </span>
-        );
-      case 'partially_paid':
-        return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#E9A23B] bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-            <Clock className="w-3 h-3" /> Part Payment
-          </span>
-        );
-      case 'needs_review':
-        return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#D94C4C] bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
-            <AlertCircle className="w-3 h-3" /> Needs Review
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
-            {status.replace('_', ' ')}
-          </span>
-        );
+  const getStatusBadge = (tx: Transaction) => {
+    if (tx.status === 'completed' || tx.status === 'merchant_confirmed') {
+      return (
+        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#168653] bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+          <CheckCircle2 className="w-3 h-3" /> Fully Paid
+        </span>
+      );
     }
+    if (tx.status === 'partially_paid') {
+      return (
+        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#E9A23B] bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
+          <Clock className="w-3 h-3" /> Part Payment
+        </span>
+      );
+    }
+    if (tx.status === 'payment_claimed' || tx.requiresReview) {
+      return (
+        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
+          <AlertCircle className="w-3 h-3" /> Check Bank Alert
+        </span>
+      );
+    }
+    if (tx.status === 'awaiting_payment') {
+      return (
+        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-700 bg-purple-50 px-2.5 py-0.5 rounded-full border border-purple-200">
+          <Clock className="w-3 h-3" /> Promised (₦0 Paid)
+        </span>
+      );
+    }
+    if (tx.status === 'refunded') {
+      return (
+        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">
+          Refunded
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
+        {tx.status.replace('_', ' ')}
+      </span>
+    );
   };
+
+  if (transactions.length === 0) {
+    return (
+      <div className="space-y-6 animate-in fade-in duration-200">
+        <LiveEmptyState
+          businessName={profile.name}
+          onNavigateToImport={() => onNavigate('import')}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
@@ -201,31 +295,123 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold text-[#19251F] tracking-tight">
-            Good day, {profile.ownerName || 'Business Owner'}
+            Welcome back, {profile.ownerName || 'Merchant'}!
           </h1>
           <p className="text-xs text-[#718078] mt-0.5">
-            Here's how {profile.name} is performing across your WhatsApp and store records.
+            Here is your shop's performance for {profile.name} — easy to see what entered and who owes you.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
+          {financialSummary.moneyOwed > 0 && (
+            <button
+              onClick={() => onNavigate('customers')}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 text-xs font-bold transition-all cursor-pointer"
+            >
+              <Coins className="w-3.5 h-3.5 text-amber-600" />
+              <span>See Who Owes You (₦{financialSummary.moneyOwed.toLocaleString()})</span>
+            </button>
+          )}
+
           <button
             onClick={() => onNavigate('import')}
             className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#145C42] to-[#103E30] text-white text-xs font-semibold shadow-xs hover:brightness-105 active:scale-98 transition-all cursor-pointer"
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Process New WhatsApp Chat</span>
+            <span>Add WhatsApp Chat</span>
           </button>
         </div>
       </div>
+
+      {/* Period Quick Filter Bar & Context */}
+      <div className="bg-slate-50/80 border border-slate-200/90 rounded-2xl p-2.5 sm:p-3 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
+          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider pl-1 shrink-0 flex items-center gap-1">
+            <Calendar className="w-3.5 h-3.5 text-slate-400" /> Filter:
+          </span>
+          {[
+            { id: 'today', label: "Today's Sales", count: periodStats.today },
+            { id: 'this_week', label: 'This Week', count: periodStats.this_week },
+            { id: 'this_month', label: 'This Month', count: periodStats.this_month },
+            { id: 'this_year', label: 'This Year', count: periodStats.this_year },
+            { id: 'all_time', label: 'All Records', count: periodStats.all_time },
+          ].map((tab) => {
+            const isActive = selectedPeriod === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => onPeriodChange?.(tab.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  isActive
+                    ? 'bg-[#145C42] text-white shadow-xs'
+                    : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+                }`}
+              >
+                <span>{tab.label}</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-semibold ${
+                    isActive ? 'bg-emerald-800 text-emerald-100' : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="text-left md:text-right text-[11px] text-slate-500 font-medium shrink-0">
+          {selectedPeriod === 'today' && `Showing today: ${new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}`}
+          {selectedPeriod === 'this_week' && 'Showing transactions from past 7 days'}
+          {selectedPeriod === 'this_month' && `Showing this month: ${new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}`}
+          {selectedPeriod === 'this_year' && `Showing calendar year: ${new Date().getFullYear()}`}
+          {selectedPeriod === 'all_time' && 'Showing all historical records'}
+        </div>
+      </div>
+
+      {/* Helpful alert if current period filter has 0 records but other records exist */}
+      {filteredTransactions.length === 0 && transactions.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs animate-in fade-in">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+              <AlertCircle className="w-4 h-4 text-amber-700" />
+            </div>
+            <div>
+              <p className="font-bold text-amber-900">
+                No orders recorded for {selectedPeriod === 'today' ? "today" : selectedPeriod === 'this_month' ? "this month" : "this period"} yet.
+              </p>
+              <p className="text-amber-700 text-[11px] mt-0.5">
+                You have {transactions.length} total orders (₦{periodStats.allTimeSales.toLocaleString()}) across all records.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => onPeriodChange?.('all_time')}
+              className="px-3 py-1.5 bg-[#145C42] hover:bg-[#103E30] text-white rounded-lg font-semibold text-xs shadow-xs transition-colors cursor-pointer"
+            >
+              View All Records (₦{periodStats.allTimeSales.toLocaleString()})
+            </button>
+            <button
+              onClick={() => onPeriodChange?.('this_month')}
+              className="px-3 py-1.5 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg font-medium text-xs transition-colors cursor-pointer"
+            >
+              Check This Month ({periodStats.this_month})
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Financial Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Sales */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden group hover:border-[#145C42]/40 transition-colors">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">Total Sales</span>
-            <div className="w-8 h-8 rounded-xl bg-[#E8F4ED] text-[#145C42] flex items-center justify-center">
+            <div>
+              <span className="text-xs font-bold text-slate-700 block">Total Sales Made</span>
+              <span className="text-[10px] text-slate-400">All agreed orders</span>
+            </div>
+            <div className="w-9 h-9 rounded-xl bg-[#E8F4ED] text-[#145C42] flex items-center justify-center font-bold">
               <TrendingUp className="w-4 h-4" />
             </div>
           </div>
@@ -234,7 +420,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
               ₦{financialSummary.totalSales.toLocaleString()}
             </div>
             <p className="text-[11px] text-[#718078] mt-1 leading-tight">
-              Total value of qualifying orders agreed in this period.
+              Total value of goods customers agreed to buy.
             </p>
           </div>
         </div>
@@ -242,8 +428,11 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
         {/* Money Received */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden group hover:border-emerald-500/40 transition-colors">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-emerald-800">Money Received</span>
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-[#168653] flex items-center justify-center">
+            <div>
+              <span className="text-xs font-bold text-emerald-900 block">Money In Bank / Hand</span>
+              <span className="text-[10px] text-emerald-700">Confirmed received</span>
+            </div>
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-[#168653] flex items-center justify-center font-bold">
               <Wallet className="w-4 h-4" />
             </div>
           </div>
@@ -252,16 +441,24 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
               ₦{financialSummary.moneyReceived.toLocaleString()}
             </div>
             <p className="text-[11px] text-[#718078] mt-1 leading-tight">
-              Confirmed funds supported by receipts or merchant verification.
+              Real money confirmed in your account or received in cash.
             </p>
+            {financialSummary.unconfirmedClaims > 0 && (
+              <div className="mt-2 text-[10px] font-semibold text-blue-800 bg-blue-50 px-2 py-1 rounded-lg border border-blue-200 inline-block">
+                +₦{financialSummary.unconfirmedClaims.toLocaleString()} claimed by customers (check alert)
+              </div>
+            )}
           </div>
         </div>
 
         {/* Money Owed to You */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden group hover:border-amber-500/40 transition-colors">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-amber-800">Money Owed to You</span>
-            <div className="w-8 h-8 rounded-xl bg-amber-50 text-[#E9A23B] flex items-center justify-center">
+            <div>
+              <span className="text-xs font-bold text-amber-900 block">Money Customers Owe You</span>
+              <span className="text-[10px] text-amber-700">Unpaid balances</span>
+            </div>
+            <div className="w-9 h-9 rounded-xl bg-amber-50 text-[#E9A23B] flex items-center justify-center font-bold">
               <Coins className="w-4 h-4" />
             </div>
           </div>
@@ -270,16 +467,28 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
               ₦{financialSummary.moneyOwed.toLocaleString()}
             </div>
             <p className="text-[11px] text-[#718078] mt-1 leading-tight">
-              Outstanding balances customers still need to pay.
+              Balances still remaining from part-payments & promises.
             </p>
+            {financialSummary.moneyOwed > 0 && (
+              <button
+                onClick={() => onNavigate('customers')}
+                className="mt-2 text-[10px] font-bold text-amber-800 hover:text-amber-900 flex items-center gap-1 cursor-pointer"
+              >
+                <span>Remind Debtors</span>
+                <ArrowRight className="w-3 h-3" />
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Transactions */}
+        {/* Total Orders Placed */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden group hover:border-slate-400 transition-colors">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">Transactions</span>
-            <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
+            <div>
+              <span className="text-xs font-bold text-slate-700 block">Total Orders</span>
+              <span className="text-[10px] text-slate-400">Recorded discussions</span>
+            </div>
+            <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold">
               <Receipt className="w-4 h-4" />
             </div>
           </div>
@@ -288,13 +497,13 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
               {financialSummary.txCount}
             </div>
             <p className="text-[11px] text-[#718078] mt-1 leading-tight">
-              Recorded business exchanges within selected period.
+              Sales transactions identified from your chats.
             </p>
           </div>
         </div>
       </div>
 
-      {/* Business Highlights & AI Observations */}
+      {/* Plain Business Highlights Banner */}
       <div className="bg-gradient-to-r from-emerald-950 via-[#103E30] to-[#145C42] rounded-2xl p-5 text-white shadow-sm">
         <div className="flex items-center justify-between pb-3 border-b border-emerald-800/60 mb-3">
           <div className="flex items-center gap-2">
@@ -302,19 +511,18 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
               <Sparkles className="w-3.5 h-3.5" />
             </div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-200">
-              Intelligent Business Highlights
+              Quick Shop Summary & Advice
             </h3>
           </div>
-          <span className="text-[11px] text-emerald-300/80">Calculated from verified data</span>
+          <span className="text-[11px] text-emerald-300/80">Calculated from your records</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           {dynamicObservations.map((obs, idx) => (
             <div
               key={idx}
-              className="p-3 rounded-xl bg-white/10 backdrop-blur-xs border border-white/10 text-xs text-emerald-50 leading-relaxed"
+              className="p-3 rounded-xl bg-white/10 backdrop-blur-xs border border-white/10 text-xs text-emerald-50 leading-relaxed font-medium"
             >
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 mb-1.5" />
               {obs}
             </div>
           ))}
@@ -463,7 +671,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
                     <span className="text-xs font-bold text-slate-900 block">
                       ₦{tx.agreedAmount.toLocaleString()}
                     </span>
-                    <div className="mt-0.5">{getStatusBadge(tx.status)}</div>
+                    <div className="mt-0.5">{getStatusBadge(tx)}</div>
                   </div>
 
                   <button
@@ -471,10 +679,11 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
                       e.stopPropagation();
                       onOpenProofModal(tx);
                     }}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-[#145C42] hover:bg-[#E8F4ED] transition-colors"
-                    title="View Evidence Proof"
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#E8F4ED] hover:bg-emerald-100 text-[#145C42] text-[11px] font-bold transition-colors cursor-pointer"
+                    title="See Bank Receipt / Proof"
                   >
-                    <ArrowRight className="w-4 h-4" />
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>See Proof</span>
                   </button>
                 </div>
               </div>
@@ -482,13 +691,52 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
           </div>
         </div>
 
-        {/* Top Performers (1 column) */}
+        {/* Top Performers & Debtors (1 column) */}
         <div className="space-y-4">
+          {/* Customers Owing Money */}
+          {customers.filter((c) => c.outstandingBalance > 0).length > 0 && (
+            <div className="bg-amber-50/60 p-5 rounded-2xl border border-amber-200/80 shadow-xs space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-amber-200">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
+                  <Coins className="w-3.5 h-3.5 text-amber-600" /> Customers Owing You
+                </h4>
+                <button
+                  onClick={() => onNavigate('customers')}
+                  className="text-[11px] font-bold text-amber-800 hover:underline cursor-pointer"
+                >
+                  View All
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {customers
+                  .filter((c) => c.outstandingBalance > 0)
+                  .sort((a, b) => b.outstandingBalance - a.outstandingBalance)
+                  .slice(0, 3)
+                  .map((cust) => (
+                    <div
+                      key={cust.id}
+                      onClick={() => onNavigate('customers')}
+                      className="flex items-center justify-between p-2.5 rounded-xl bg-white/90 border border-amber-100 text-xs cursor-pointer hover:bg-white transition-colors"
+                    >
+                      <div className="truncate pr-2">
+                        <span className="font-bold text-slate-900 block truncate">{cust.name}</span>
+                        <span className="text-[10px] text-slate-500 font-mono">{cust.phone || 'WhatsApp contact'}</span>
+                      </div>
+                      <span className="font-extrabold text-[#E9A23B] shrink-0">
+                        Owes ₦{cust.outstandingBalance.toLocaleString()}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
           {/* Best-Performing Customers */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                <Users className="w-3.5 h-3.5 text-[#145C42]" /> Top Customers
+                <Users className="w-3.5 h-3.5 text-[#145C42]" /> Top Customers (By Total Spent)
               </h4>
               <button
                 onClick={() => onNavigate('customers')}

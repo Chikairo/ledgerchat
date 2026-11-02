@@ -15,10 +15,15 @@ import {
   FileCode,
   RotateCcw,
   Check,
+  Tag,
+  AlertTriangle,
+  Layers,
+  ChevronRight,
+  HelpCircle,
 } from 'lucide-react';
 import { AIService, ExtractionResult } from '../services/aiService';
 import { StorageService } from '../services/storage';
-import { SAMPLE_WHATSAPP_EXPORT_TEXT } from '../data/demoData';
+import { SAMPLE_WHATSAPP_EXPORT_TEXT, NIGERIAN_TEST_SCENARIOS } from '../data/demoData';
 import { Transaction, Customer, Product, ImportSummary } from '../types';
 
 interface ImportPageProps {
@@ -36,16 +41,18 @@ export const ImportPage: React.FC<ImportPageProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [extractedData, setExtractedData] = useState<any[] | null>(null);
   const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
+  const [activeScenarioId, setActiveScenarioId] = useState<string | null>(null);
+  const [dedupStats, setDedupStats] = useState<{ added: number; updated: number; flaggedDuplicates: number } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const processingSteps = [
     'Reading conversation files and attachments...',
     'Identifying business inquiries and price quotes...',
-    'Calling Gemma 4 AI engine to structure orders...',
+    'Calling Gemma 4 AI engine with Nigerian accounting rules...',
     'Examining payment claims and receipt evidence...',
     'Organizing customer profiles and product metrics...',
-    'Finalizing business ledger records...',
+    'Applying deduplication and finalizing ledger records...',
   ];
 
   const handleFileSelect = (files: FileList | null) => {
@@ -53,6 +60,7 @@ export const ImportPage: React.FC<ImportPageProps> = ({
     const newFiles = Array.from(files);
     setSelectedFiles((prev) => [...prev, ...newFiles]);
     setErrorMessage(null);
+    setActiveScenarioId(null);
   };
 
   const removeFile = (index: number) => {
@@ -62,12 +70,25 @@ export const ImportPage: React.FC<ImportPageProps> = ({
   // Load sample Nigerian WhatsApp export for quick demonstration
   const handleLoadSampleChat = () => {
     const blob = new Blob([SAMPLE_WHATSAPP_EXPORT_TEXT], { type: 'text/plain' });
-    const sampleFile = new File([blob], 'WhatsApp_Chat_with_Alhaji_Musa.txt', {
+    const sampleFile = new File([blob], 'WhatsApp_Chat_Alhaji_Musa_Bulk_Chargers.txt', {
       type: 'text/plain',
       lastModified: Date.now(),
     });
     setSelectedFiles([sampleFile]);
     setErrorMessage(null);
+    setActiveScenarioId('default_sample');
+  };
+
+  // Load specific Nigerian test scenario
+  const handleLoadScenario = (scenario: typeof NIGERIAN_TEST_SCENARIOS[0]) => {
+    const blob = new Blob([scenario.text], { type: 'text/plain' });
+    const sampleFile = new File([blob], `WhatsApp_${scenario.id}.txt`, {
+      type: 'text/plain',
+      lastModified: Date.now(),
+    });
+    setSelectedFiles([sampleFile]);
+    setErrorMessage(null);
+    setActiveScenarioId(scenario.id);
   };
 
   const handleStartImport = async () => {
@@ -79,6 +100,7 @@ export const ImportPage: React.FC<ImportPageProps> = ({
     setIsProcessing(true);
     setErrorMessage(null);
     setCurrentStep(0);
+    setDedupStats(null);
 
     try {
       let combinedChatText = '';
@@ -112,7 +134,7 @@ export const ImportPage: React.FC<ImportPageProps> = ({
         combinedChatText = `[Customer uploaded ${imageAttachmentsCount} receipt images without text transcript. Extract transaction context from receipt proof.]`;
       }
 
-      // Step 2 & 3: Call Gemma 4 AI
+      // Step 2 & 3: Call Gemma 4 AI with Nigerian Accounting Rules
       setCurrentStep(1);
       await new Promise((r) => setTimeout(r, 700));
       setCurrentStep(2);
@@ -136,7 +158,19 @@ export const ImportPage: React.FC<ImportPageProps> = ({
       if (aiResponse.transactions && aiResponse.transactions.length > 0) {
         aiResponse.transactions.forEach((tx, idx) => {
           const txnId = `TXN-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-          const isReview = tx.requiresReview || tx.status === 'needs_review' || tx.outstandingAmount > 0;
+
+          // Deterministic balance calculation
+          const agreed = Number(tx.agreedAmount) || 0;
+          const paid = Number(tx.amountPaid) || 0;
+          const balance = Math.max(0, agreed - paid);
+
+          const isReview =
+            tx.requiresReview ||
+            tx.status === 'needs_review' ||
+            tx.status === 'payment_claimed' ||
+            balance > 0 ||
+            tx.paymentClaimStatus === 'customer_claimed';
+
           if (isReview) reviewCount++;
 
           const newTxn: Transaction = {
@@ -146,20 +180,26 @@ export const ImportPage: React.FC<ImportPageProps> = ({
             customerPhone: tx.customerPhone || aiResponse.customerPhone,
             productName: tx.productName || 'General Merchandise',
             quantity: tx.quantity || 1,
-            agreedAmount: tx.agreedAmount || 0,
-            amountPaid: tx.amountPaid || 0,
-            outstandingAmount: tx.outstandingAmount || 0,
+            agreedAmount: agreed,
+            amountPaid: paid,
+            outstandingAmount: balance,
             currency: tx.currency || 'NGN',
             date: tx.date || new Date().toISOString(),
-            status: (tx.status as any) || 'completed',
-            paymentClaimStatus: (tx.paymentClaimStatus as any) || 'receipt_submitted',
+            status: (tx.status as any) || 'payment_claimed',
+            paymentClaimStatus: (tx.paymentClaimStatus as any) || 'customer_claimed',
             paymentMethod: tx.paymentMethod || 'Bank Transfer',
             sourceMessages: tx.sourceMessages || [
-              `Extracted quote: ${tx.productName} for ₦${tx.agreedAmount?.toLocaleString()}`,
+              `Extracted quote: ${tx.productName} for ₦${agreed?.toLocaleString()}`,
             ],
             confidence: tx.confidence || 0.94,
             requiresReview: isReview,
-            reviewReason: tx.reviewReason,
+            reviewReason:
+              tx.reviewReason ||
+              (tx.status === 'payment_claimed'
+                ? 'Customer claim pending merchant verification in bank statements'
+                : balance > 0
+                ? `Customer has an outstanding balance of ₦${balance.toLocaleString()}`
+                : undefined),
             evidence: [
               {
                 id: 'ev_' + Math.random().toString(36).substring(2, 8),
@@ -167,7 +207,7 @@ export const ImportPage: React.FC<ImportPageProps> = ({
                 content: tx.evidenceNotes || 'Extracted from WhatsApp conversation export',
                 timestamp: new Date().toISOString(),
                 matchConfidence: tx.confidence || 0.92,
-                verificationNote: `AI parsed agreement: ₦${tx.amountPaid?.toLocaleString()} paid of ₦${tx.agreedAmount?.toLocaleString()}`,
+                verificationNote: `Agreed order value: ₦${agreed?.toLocaleString()}. Paid: ₦${paid?.toLocaleString()}. Balance: ₦${balance?.toLocaleString()}.`,
                 status: isReview ? 'needs_review' : 'merchant_confirmed',
               },
             ],
@@ -187,9 +227,9 @@ export const ImportPage: React.FC<ImportPageProps> = ({
         fileSize: selectedFiles.reduce((acc, f) => acc + f.size, 0),
         importedAt: new Date().toISOString(),
         conversationsProcessed: 1,
-        activitiesIdentified: transactionsToSave.length * 2 + 1,
+        activitiesIdentified: Math.max(1, transactionsToSave.length * 2),
         transactionsExtracted: transactionsToSave.length,
-        customersIdentified: 1,
+        customersIdentified: transactionsToSave.length > 0 ? 1 : 0,
         productsIdentified: transactionsToSave.length,
         evidenceFound: imageAttachmentsCount + transactionsToSave.length,
         requiresReviewCount: reviewCount,
@@ -208,17 +248,20 @@ export const ImportPage: React.FC<ImportPageProps> = ({
     }
   };
 
-  // Commit extracted transactions into storage
+  // Commit extracted transactions into storage using intelligent deduplication
   const handleSaveToLedger = () => {
     if (!extractedData || !importSummary) return;
 
-    extractedData.forEach((tx) => {
-      StorageService.updateTransaction(tx);
-    });
+    // Use intelligent deduplication method in StorageService
+    const stats = StorageService.importTransactions(extractedData);
+    setDedupStats(stats);
 
     StorageService.addImportRecord(importSummary);
     onImportComplete(importSummary);
-    onNavigateToTransactions();
+
+    setTimeout(() => {
+      onNavigateToTransactions();
+    }, 1500);
   };
 
   return (
@@ -226,18 +269,60 @@ export const ImportPage: React.FC<ImportPageProps> = ({
       {/* Title */}
       <div>
         <h1 className="text-2xl font-extrabold text-[#19251F] tracking-tight">
-          Import Business Conversations
+          Add WhatsApp Conversations
         </h1>
         <p className="text-xs text-[#718078] mt-0.5">
-          Bring your WhatsApp chats and payment slips together. Gemma 4 will organize sales records, customer balances, and products for you.
+          LedgerChat reads your WhatsApp business chats, understands Nigerian Pidgin & market bargaining, records what was sold, and separates paid money from debts.
         </p>
       </div>
 
-      {/* Privacy Notice */}
+      {/* Nigerian Business Testing Bench Ribbon */}
+      <div className="bg-gradient-to-r from-emerald-950 via-[#103E30] to-[#145C42] rounded-2xl p-5 text-white shadow-xs space-y-3">
+        <div className="flex items-center justify-between pb-2 border-b border-emerald-800/70">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-emerald-300" />
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-200">
+              Try Ready-Made Nigerian WhatsApp Test Chats
+            </span>
+          </div>
+          <span className="text-[10px] text-emerald-300/80 font-semibold">Click to test instantly</span>
+        </div>
+
+        <p className="text-xs text-emerald-100 leading-relaxed">
+          Click any of these real Lagos market chats to see how LedgerChat handles Nigerian Pidgin, price bargaining, part-payments, and payment promises:
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 pt-1">
+          {NIGERIAN_TEST_SCENARIOS.map((sc) => {
+            const isSelected = activeScenarioId === sc.id;
+            return (
+              <button
+                key={sc.id}
+                onClick={() => handleLoadScenario(sc)}
+                className={`p-3 rounded-xl text-left transition-all border cursor-pointer ${
+                  isSelected
+                    ? 'bg-emerald-500/20 border-emerald-400 text-white ring-1 ring-emerald-400'
+                    : 'bg-white/10 hover:bg-white/15 border-white/10 text-emerald-100'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs">{sc.title}</span>
+                  <ChevronRight className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
+                </div>
+                <p className="text-[10px] text-emerald-200/80 mt-1 line-clamp-2 leading-relaxed">
+                  {sc.description}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Safety Notice */}
       <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-700 flex items-start gap-2.5">
         <ShieldCheck className="w-4 h-4 text-[#145C42] shrink-0 mt-0.5" />
         <div className="leading-relaxed">
-          <strong>Privacy & Merchant Confidentiality:</strong> LedgerChat only analyzes the conversation files you explicitly choose to upload. We never access private WhatsApp backups or connect uninvited. All processing is strictly isolated to your business profile.
+          <strong>Safe & Accurate:</strong> Uploading the same chat twice will never create duplicate orders. Also, a customer saying "I don send am" will never be counted as received money until you confirm it in your bank.
         </div>
       </div>
 
@@ -259,10 +344,10 @@ export const ImportPage: React.FC<ImportPageProps> = ({
 
             <div>
               <h3 className="text-base font-bold text-[#19251F]">
-                Bring your business conversations together
+                Upload your WhatsApp exported chat
               </h3>
               <p className="text-xs text-[#718078] max-w-md mx-auto mt-1">
-                Upload your WhatsApp exported <strong>.txt</strong> or <strong>.zip</strong> archive and available bank transfer receipts.
+                Drop your WhatsApp <strong>.txt</strong> file, <strong>.zip</strong> archive, or bank receipt screenshot here.
               </p>
             </div>
 
@@ -281,7 +366,7 @@ export const ImportPage: React.FC<ImportPageProps> = ({
                 className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
               >
                 <FileCode className="w-3.5 h-3.5 text-[#145C42]" />
-                Load Sample WhatsApp Chat
+                Load Computer Village Sample
               </button>
 
               <input
@@ -306,10 +391,13 @@ export const ImportPage: React.FC<ImportPageProps> = ({
             <div className="bg-white p-4 rounded-2xl border border-slate-200 space-y-3">
               <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                 <span className="text-xs font-bold text-slate-800">
-                  Selected Files ({selectedFiles.length})
+                  Ready to Process ({selectedFiles.length} file{selectedFiles.length > 1 ? 's' : ''})
                 </span>
                 <button
-                  onClick={() => setSelectedFiles([])}
+                  onClick={() => {
+                    setSelectedFiles([]);
+                    setActiveScenarioId(null);
+                  }}
                   className="text-[11px] text-rose-600 hover:underline cursor-pointer"
                 >
                   Clear All
@@ -355,7 +443,7 @@ export const ImportPage: React.FC<ImportPageProps> = ({
                   className="w-full py-3 rounded-xl bg-gradient-to-r from-[#145C42] to-[#103E30] text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm hover:brightness-110 active:scale-98 transition-all cursor-pointer"
                 >
                   <Sparkles className="w-4 h-4" />
-                  <span>Process Conversations with Gemma 4</span>
+                  <span>Process Conversations with Gemma 4 Engine</span>
                 </button>
               </div>
             </div>
@@ -373,7 +461,7 @@ export const ImportPage: React.FC<ImportPageProps> = ({
                     Gemma 4 AI is analyzing your business conversations...
                   </h4>
                   <p className="text-xs text-slate-500">
-                    Extracting transactions, verifying price agreements, and checking receipts
+                    Extracting transactions, verifying price agreements, separating promises from payments
                   </p>
                 </div>
               </div>
@@ -483,7 +571,7 @@ export const ImportPage: React.FC<ImportPageProps> = ({
                 </h3>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Review the extracted financial records below before saving into your business ledger.
+                Review the parsed financial records below before saving into your business ledger.
               </p>
             </div>
 
@@ -491,85 +579,138 @@ export const ImportPage: React.FC<ImportPageProps> = ({
               onClick={() => {
                 setExtractedData(null);
                 setSelectedFiles([]);
+                setDedupStats(null);
               }}
               className="text-xs text-slate-500 hover:text-slate-800 cursor-pointer"
             >
-              Import Another
+              Test Another Chat
             </button>
           </div>
+
+          {/* Non-converting conversation result alert */}
+          {extractedData.length === 0 && (
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-slate-900">Zero Financial Orders Found</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  This conversation contained greetings or inquiries that did not result in an agreed order. No false transactions were created.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Metrics summary */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-            <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-              <span className="text-[10px] text-slate-500 uppercase font-bold block">Orders Extracted</span>
-              <span className="text-lg font-bold text-slate-900">{extractedData.length}</span>
+          {extractedData.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <span className="text-[10px] text-slate-500 uppercase font-bold block">Orders Extracted</span>
+                <span className="text-lg font-bold text-slate-900">{extractedData.length}</span>
+              </div>
+              <div className="p-3 rounded-xl bg-emerald-50/60 border border-emerald-100">
+                <span className="text-[10px] text-emerald-800 uppercase font-bold block">Total Agreed Sales</span>
+                <span className="text-lg font-bold text-emerald-800">
+                  ₦{extractedData.reduce((acc, t) => acc + (t.status !== 'refunded' ? t.agreedAmount : 0), 0).toLocaleString()}
+                </span>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <span className="text-[10px] text-slate-500 uppercase font-bold block">Evidence Found</span>
+                <span className="text-lg font-bold text-slate-900">{importSummary?.evidenceFound || 1}</span>
+              </div>
+              <div className="p-3 rounded-xl bg-amber-50/60 border border-amber-100">
+                <span className="text-[10px] text-amber-800 uppercase font-bold block">Requires Review</span>
+                <span className="text-lg font-bold text-amber-800">{importSummary?.requiresReviewCount || 0}</span>
+              </div>
             </div>
-            <div className="p-3 rounded-xl bg-emerald-50/60 border border-emerald-100">
-              <span className="text-[10px] text-emerald-800 uppercase font-bold block">Total Agreed Sales</span>
-              <span className="text-lg font-bold text-emerald-800">
-                ₦{extractedData.reduce((acc, t) => acc + t.agreedAmount, 0).toLocaleString()}
-              </span>
-            </div>
-            <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-              <span className="text-[10px] text-slate-500 uppercase font-bold block">Evidence Found</span>
-              <span className="text-lg font-bold text-slate-900">{importSummary?.evidenceFound || 1}</span>
-            </div>
-            <div className="p-3 rounded-xl bg-amber-50/60 border border-amber-100">
-              <span className="text-[10px] text-amber-800 uppercase font-bold block">Requires Review</span>
-              <span className="text-lg font-bold text-amber-800">{importSummary?.requiresReviewCount || 0}</span>
-            </div>
-          </div>
+          )}
 
           {/* Extracted records list */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Extracted Records ({extractedData.length})
-            </h4>
+          {extractedData.length > 0 && (
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Extracted Business Records ({extractedData.length})
+              </h4>
 
-            <div className="space-y-2 max-h-80 overflow-y-auto">
-              {extractedData.map((item, i) => (
-                <div
-                  key={i}
-                  className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-3 text-xs"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900">{item.customerName}</span>
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        {item.quantity}x {item.productName}
+              <div className="space-y-2.5 max-h-80 overflow-y-auto">
+                {extractedData.map((item, i) => (
+                  <div
+                    key={i}
+                    className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900">{item.customerName}</span>
+                        <span className="text-[10px] text-slate-500 font-mono">
+                          {item.quantity}x {item.productName}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-600 mt-0.5">
+                        Agreed Order Value: <strong>₦{item.agreedAmount.toLocaleString()}</strong> | Paid:{' '}
+                        <strong className="text-emerald-700">₦{item.amountPaid.toLocaleString()}</strong>
+                        {item.outstandingAmount > 0 && (
+                          <span className="text-amber-700 font-semibold ml-1">
+                            (₦{item.outstandingAmount.toLocaleString()} balance due)
+                          </span>
+                        )}
+                      </p>
+                      {item.reviewReason && (
+                        <p className="text-[10px] text-amber-800 mt-1 flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
+                          <span>{item.reviewReason}</span>
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="text-left sm:text-right shrink-0">
+                      <span
+                        className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full inline-block ${
+                          item.status === 'completed'
+                            ? 'text-emerald-800 bg-emerald-100'
+                            : item.status === 'partially_paid'
+                            ? 'text-amber-800 bg-amber-100'
+                            : item.status === 'awaiting_payment'
+                            ? 'text-purple-800 bg-purple-100'
+                            : item.status === 'refunded'
+                            ? 'text-rose-800 bg-rose-100'
+                            : 'text-blue-800 bg-blue-100'
+                        }`}
+                      >
+                        {item.status === 'payment_claimed'
+                          ? 'Claimed (Unverified)'
+                          : item.status === 'awaiting_payment'
+                          ? 'Promise (Zero Paid)'
+                          : item.status.replace('_', ' ')}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      Agreed: <strong>₦{item.agreedAmount.toLocaleString()}</strong> | Paid:{' '}
-                      <strong className="text-emerald-700">₦{item.amountPaid.toLocaleString()}</strong>
-                      {item.outstandingAmount > 0 && (
-                        <span className="text-amber-700 font-semibold ml-1">
-                          (₦{item.outstandingAmount.toLocaleString()} balance)
-                        </span>
-                      )}
-                    </p>
                   </div>
-
-                  <div className="text-right shrink-0">
-                    <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                      {item.status.replace('_', ' ')}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Deduplication Feedback if committed */}
+          {dedupStats && (
+            <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-[#168653] shrink-0" />
+              <span>
+                <strong>Deduplication Complete:</strong> {dedupStats.added} new order(s) added,{' '}
+                {dedupStats.updated} existing record(s) safely merged with latest evidence. Zero duplicates created!
+              </span>
+            </div>
+          )}
 
           {/* Save Action */}
-          <div className="pt-2 flex items-center gap-3">
-            <button
-              onClick={handleSaveToLedger}
-              className="flex-1 py-3 rounded-xl bg-[#145C42] hover:bg-[#103E30] text-white font-bold text-xs shadow-md transition-colors flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Save {extractedData.length} Orders to Business Ledger</span>
-            </button>
-          </div>
+          {extractedData.length > 0 && (
+            <div className="pt-2 flex items-center gap-3">
+              <button
+                onClick={handleSaveToLedger}
+                className="flex-1 py-3 rounded-xl bg-[#145C42] hover:bg-[#103E30] text-white font-bold text-xs shadow-md transition-colors flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Save {extractedData.length} Order(s) to Business Ledger</span>
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

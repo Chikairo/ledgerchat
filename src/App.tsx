@@ -1,3 +1,8 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
@@ -5,7 +10,10 @@ import { MobileNav } from './components/MobileNav';
 import { ProofModal } from './components/ProofModal';
 import { TransactionDrawer } from './components/TransactionDrawer';
 import { OnboardingModal } from './components/OnboardingModal';
+import { AuthModal } from './components/AuthModal';
+import { UserEntryModal } from './components/UserEntryModal';
 
+import { LandingPage } from './pages/LandingPage';
 import { OverviewPage } from './pages/OverviewPage';
 import { TransactionsPage } from './pages/TransactionsPage';
 import { CustomersPage } from './pages/CustomersPage';
@@ -15,11 +23,38 @@ import { ConversationsPage } from './pages/ConversationsPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ImportPage } from './pages/ImportPage';
+import { DeveloperPage } from './pages/DeveloperPage';
 
 import { StorageService } from './services/storage';
 import { BusinessProfile, Transaction, Customer, Product, Conversation, ImportSummary } from './types';
 
 export default function App() {
+  // Public Landing vs App Dashboard view state
+  const [currentView, setCurrentView] = useState<'landing' | 'app'>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const viewParam = params.get('view');
+      const envParam = params.get('env');
+      const pageParam = params.get('page');
+      const pathname = window.location.pathname;
+
+      if (
+        viewParam === 'app' ||
+        viewParam === 'demo' ||
+        envParam === 'demo' ||
+        envParam === 'live' ||
+        envParam === 'real' ||
+        pageParam ||
+        pathname.startsWith('/app') ||
+        pathname.startsWith('/demo') ||
+        pathname.startsWith('/developer')
+      ) {
+        return 'app';
+      }
+    }
+    return 'landing';
+  });
+
   const [currentPage, setCurrentPage] = useState<string>('overview');
   const [activeMode, setActiveMode] = useState<'demo' | 'real'>(() => StorageService.getActiveMode());
   const [selectedPeriod, setSelectedPeriod] = useState<string>('this_month');
@@ -36,6 +71,9 @@ export default function App() {
   const [drawerTransaction, setDrawerTransaction] = useState<Transaction | null>(null);
   const [proofTransaction, setProofTransaction] = useState<Transaction | null>(null);
   const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
+  const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
+  const [authInitialMode, setAuthInitialMode] = useState<'login' | 'register'>('register');
+  const [showUserEntryModal, setShowUserEntryModal] = useState<boolean>(false);
 
   // Sync state whenever storage updates
   const reloadData = useCallback(() => {
@@ -45,6 +83,32 @@ export default function App() {
     setCustomers(StorageService.getCustomers());
     setProducts(StorageService.getProducts());
     setConversations(StorageService.getConversations());
+  }, []);
+
+  // Check URL parameters for environment routing
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const envParam = params.get('env');
+      const viewParam = params.get('view');
+      const pageParam = params.get('page');
+      const pathname = window.location.pathname;
+
+      if (envParam === 'demo' || viewParam === 'demo' || pathname.startsWith('/demo')) {
+        StorageService.setActiveMode('demo');
+        setActiveMode('demo');
+        setCurrentView('app');
+      } else if (envParam === 'live' || envParam === 'real' || viewParam === 'app' || pathname.startsWith('/app')) {
+        StorageService.setActiveMode('real');
+        setActiveMode('real');
+        setCurrentView('app');
+      }
+
+      if (pathname === '/developer' || pageParam === 'developer') {
+        setCurrentPage('developer');
+        setCurrentView('app');
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -60,6 +124,10 @@ export default function App() {
     StorageService.setActiveMode(newMode);
     setActiveMode(newMode);
     reloadData();
+    if (newMode === 'real' && !StorageService.getProfile().isOnboarded) {
+      setAuthInitialMode('register');
+      setShowAuthModal(true);
+    }
   };
 
   const handleResetDemo = () => {
@@ -97,6 +165,77 @@ export default function App() {
     (t) => t.requiresReview || t.status === 'needs_review'
   ).length;
 
+  // ----------------------------------------------------
+  // Render: 1. Public Marketing Landing Page
+  // ----------------------------------------------------
+  if (currentView === 'landing') {
+    return (
+      <>
+        <LandingPage
+          onExploreDemo={() => {
+            StorageService.setActiveMode('demo');
+            setActiveMode('demo');
+            reloadData();
+            setCurrentPage('overview');
+            setCurrentView('app');
+          }}
+          onOpenEntryModal={() => setShowUserEntryModal(true)}
+          onOpenSignIn={() => {
+            setAuthInitialMode('login');
+            setShowAuthModal(true);
+          }}
+          onOpenDeveloperDocs={() => {
+            setCurrentPage('developer');
+            setCurrentView('app');
+          }}
+        />
+
+        {/* User Entry / Account Selection Portal */}
+        <UserEntryModal
+          isOpen={showUserEntryModal}
+          onClose={() => setShowUserEntryModal(false)}
+          onExploreDemo={() => {
+            StorageService.setActiveMode('demo');
+            setActiveMode('demo');
+            reloadData();
+            setCurrentPage('overview');
+            setCurrentView('app');
+          }}
+          onCreateAccount={() => {
+            setAuthInitialMode('register');
+            setShowAuthModal(true);
+          }}
+          onSignIn={() => {
+            setAuthInitialMode('login');
+            setShowAuthModal(true);
+          }}
+        />
+
+        {/* Merchant Live Auth Modal */}
+        <AuthModal
+          isOpen={showAuthModal}
+          initialMode={authInitialMode}
+          onClose={() => setShowAuthModal(false)}
+          onSuccess={(newProfile) => {
+            reloadData();
+            setShowAuthModal(false);
+            setCurrentPage('overview');
+            setCurrentView('app');
+          }}
+          onSwitchToDemo={() => {
+            handleToggleMode('demo');
+            setShowAuthModal(false);
+            setCurrentPage('overview');
+            setCurrentView('app');
+          }}
+        />
+      </>
+    );
+  }
+
+  // ----------------------------------------------------
+  // Render: 2. Merchant Application Workspace
+  // ----------------------------------------------------
   return (
     <div className="min-h-screen bg-[#F7F9F7] text-[#19251F] flex flex-col font-sans">
       {/* Top Navigation */}
@@ -108,6 +247,11 @@ export default function App() {
         activeMode={activeMode}
         onToggleMode={handleToggleMode}
         onResetDemo={handleResetDemo}
+        onOpenAuthModal={() => {
+          setAuthInitialMode('login');
+          setShowAuthModal(true);
+        }}
+        onNavigateToHome={() => setCurrentView('landing')}
       />
 
       <div className="flex-1 flex overflow-hidden">
@@ -130,6 +274,7 @@ export default function App() {
                 customers={customers}
                 products={products}
                 selectedPeriod={selectedPeriod}
+                onPeriodChange={setSelectedPeriod}
                 onSelectTransaction={(tx) => setDrawerTransaction(tx)}
                 onNavigate={setCurrentPage}
                 onOpenProofModal={(tx) => setProofTransaction(tx)}
@@ -214,6 +359,8 @@ export default function App() {
               />
             )}
 
+            {currentPage === 'developer' && <DeveloperPage />}
+
             {currentPage === 'onboarding' && (
               <div className="py-6">
                 <OnboardingModal
@@ -256,6 +403,22 @@ export default function App() {
         transaction={proofTransaction}
         onClose={() => setProofTransaction(null)}
         onUpdateStatus={handleUpdateTransactionStatus}
+      />
+
+      {/* Merchant Live Auth Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        initialMode={authInitialMode}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={(newProfile) => {
+          reloadData();
+          setShowAuthModal(false);
+          setCurrentPage('overview');
+        }}
+        onSwitchToDemo={() => {
+          handleToggleMode('demo');
+          setShowAuthModal(false);
+        }}
       />
 
       {/* Onboarding Dialog */}

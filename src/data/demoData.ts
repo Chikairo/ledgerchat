@@ -231,7 +231,59 @@ export const DEMO_PRODUCTS: Product[] = [
   }
 ];
 
-export const DEMO_TRANSACTIONS: Transaction[] = [
+/**
+ * Dynamic date calculator anchored to the current execution date.
+ * Guarantees that:
+ * - Indices 0..2 fall TODAY (2, 4.5, and 6 hours ago)
+ * - Indices 3..5 fall YESTERDAY or within the current calendar week
+ * - Indices 0..14 fall strictly in THIS CURRENT CALENDAR MONTH
+ * - Indices 15..21 fall in the PREVIOUS CALENDAR MONTH (for historical trends/annual reports)
+ */
+export function getDynamicTxDate(index: number): { txDate: string; evidenceDate: string } {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  const currentDay = now.getDate();
+
+  const d = new Date(now);
+
+  if (index === 0) {
+    // Today, ~2 hours ago
+    d.setHours(Math.max(1, d.getHours() - 2), 20, 0, 0);
+  } else if (index === 1) {
+    // Today, ~4.5 hours ago
+    d.setHours(Math.max(0, d.getHours() - 4), 45, 0, 0);
+  } else if (index === 2) {
+    // Today, ~6 hours ago
+    d.setHours(Math.max(0, d.getHours() - 6), 15, 0, 0);
+  } else if (index <= 5) {
+    // Yesterday or within the last 2-3 days (strictly in this month or current week)
+    if (currentDay > 1) {
+      d.setDate(Math.max(1, currentDay - (index - 2)));
+      d.setHours(14, 10 + index * 7, 0, 0);
+    } else {
+      d.setHours(Math.max(0, 8 + index), 15, 0, 0);
+    }
+  } else if (index <= 14) {
+    // Always strictly in the current calendar month
+    const targetDay = currentDay > 6 ? Math.max(1, Math.floor(currentDay * (1 - (index - 5) / 12))) : 1;
+    d.setFullYear(currentYear, currentMonth, targetDay);
+    d.setHours(10 + (index % 8), (index * 13) % 60, 0, 0);
+  } else {
+    // Previous month (for historical comparison and annual analytics)
+    const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+    const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+    const prevDay = 10 + (index % 15);
+    d.setFullYear(prevYear, prevMonth, prevDay);
+    d.setHours(11, 30, 0, 0);
+  }
+
+  const txDate = d.toISOString();
+  const evDate = new Date(d.getTime() - 5 * 60 * 1000).toISOString();
+  return { txDate, evidenceDate: evDate };
+}
+
+const RAW_DEMO_TRANSACTIONS: Transaction[] = [
   {
     id: 'TXN-2026-1001',
     customerId: 'cust_1',
@@ -1083,6 +1135,22 @@ export const DEMO_TRANSACTIONS: Transaction[] = [
   }
 ];
 
+export function getFreshDemoTransactions(): Transaction[] {
+  return RAW_DEMO_TRANSACTIONS.map((tx, idx) => {
+    const { txDate, evidenceDate } = getDynamicTxDate(idx);
+    return {
+      ...tx,
+      date: txDate,
+      evidence: (tx.evidence || []).map((ev) => ({
+        ...ev,
+        timestamp: evidenceDate,
+      })),
+    };
+  });
+}
+
+export const DEMO_TRANSACTIONS: Transaction[] = getFreshDemoTransactions();
+
 export const DEMO_CONVERSATIONS: Conversation[] = [
   {
     id: 'conv_1',
@@ -1241,3 +1309,92 @@ export const SAMPLE_WHATSAPP_EXPORT_TEXT = `[28/10/2026, 15:45:12] Alhaji Musa B
 [29/10/2026, 09:14:30] Chidubem Okafor: Kabiru ₦28,000 each gives ₦140,000 total.
 [29/10/2026, 09:20:00] Kabiru Sanusi: Done, check your Moniepoint. Alert should have landed. 140k sent.
 [29/10/2026, 09:24:00] Chidubem Okafor: Moniepoint alert confirmed bro! Sending the units now.`;
+
+export const NIGERIAN_TEST_SCENARIOS = [
+  {
+    id: 'scenario_pidgin_negotiation',
+    title: 'Pidgin Negotiation & Partial Payment',
+    description: 'Bargaining asking price down from ₦75,000 to ₦68,000, paying ₦40,000 deposit with ₦28,000 balance owed.',
+    text: `[24/10/2026, 11:20:15] Emeka Nwosu: Chidi how far? Wetin be the last price for two 30,000mAh Romoss power bank?
+[24/10/2026, 11:22:30] Chidubem Okafor: Emeka bro, one is ₦37,500. Two will be ₦75,000. Original with warranty.
+[24/10/2026, 11:25:10] Emeka Nwosu: Ah my guy, commot something for me abeg. Do ₦65,000 for both.
+[24/10/2026, 11:27:00] Chidubem Okafor: No way bro, dollar don go up. Last price I fit do is ₦68,000 for the 2 pieces. That's ₦34k each.
+[24/10/2026, 11:29:45] Emeka Nwosu: Oya sharp. Drop your aza. Make I send ₦40,000 first, I go balance the remaining ₦28,000 tomorrow when my customer pick am up.
+[24/10/2026, 11:31:00] Chidubem Okafor: Opay - 9021194087 - Chidubem Okafor. No problem, balance ₦28k tomorrow.
+[24/10/2026, 11:42:15] Emeka Nwosu: <attached: OPay_Receipt_40000.jpg>
+[24/10/2026, 11:43:00] Emeka Nwosu: 40k deposit sent! Confirm alert.
+[24/10/2026, 11:45:10] Chidubem Okafor: Alert of ₦40,000 seen bro! Packing the 2 power banks. Remaining balance is ₦28,000.`,
+  },
+  {
+    id: 'scenario_multi_orders',
+    title: 'Multiple Separate Orders Over Weeks',
+    description: 'Customer makes two distinct purchases on different dates in one chat (10 GaN chargers on Oct 12, then 2 FreePods on Oct 24).',
+    text: `[12/10/2026, 10:15:00] Blessing Adeyemi: Hello Chidi, I need 10 fast chargers for my boutique display.
+[12/10/2026, 10:18:20] Chidubem Okafor: Hello Blessing! That is ₦14,000 each = ₦140,000.
+[12/10/2026, 10:25:00] Blessing Adeyemi: Paid ₦140,000 via GTBank. Reference: GTB9921804.
+[12/10/2026, 10:28:00] Chidubem Okafor: Payment confirmed! Goods dispatched to Lekki.
+[24/10/2026, 14:10:00] Blessing Adeyemi: Hi Chidi, hope business is good. Please do you have Oraimo FreePods 4 in black?
+[24/10/2026, 14:12:00] Chidubem Okafor: Yes Blessing, 2 pairs available. ₦22,000 each = ₦44,000.
+[24/10/2026, 14:15:00] Blessing Adeyemi: Send both please. Sent ₦44,000 to your Access Bank.
+[24/10/2026, 14:20:00] Chidubem Okafor: Received in full! Dispatch rider will bring them today.`,
+  },
+  {
+    id: 'scenario_payment_promise',
+    title: 'Payment Promise (Zero Money Received)',
+    description: 'Customer promises to pay on Friday at monthend. System must NOT classify promise as money received.',
+    text: `[26/10/2026, 16:00:10] Victor Chukwuemeka: Oga Chidi, I want that Smartwatch Ultra 8 with orange strap.
+[26/10/2026, 16:02:00] Chidubem Okafor: Brother, it is ₦35,000.
+[26/10/2026, 16:05:30] Victor Chukwuemeka: Beautiful. Please reserve it for me. I don't have cash right now, but salary drops on Friday. I will definitely transfer the full ₦35,000 on Friday morning.
+[26/10/2026, 16:07:00] Chidubem Okafor: Okay Victor, I will keep it aside for you till Friday.`,
+  },
+  {
+    id: 'scenario_unverified_claim',
+    title: 'Customer Claim Without Merchant Confirmation',
+    description: 'Customer claims to have transferred money, but merchant has not received alert. Must be marked needs review / claimed, NOT confirmed.',
+    text: `[27/10/2026, 13:40:00] Ngozi Eze: Chidi, I want 1 JBL Charge 5 speaker.
+[27/10/2026, 13:42:00] Chidubem Okafor: Hello Ngozi, that is ₦115,000.
+[27/10/2026, 13:55:00] Ngozi Eze: I have just transferred ₦115,000 from my Zenith app. Please confirm alert!
+[27/10/2026, 14:02:00] Chidubem Okafor: Ngozi, I am checking my statement now. Network is fluctuating and alert never drop. Let me wait for bank notification before I can release the goods.`,
+  },
+  {
+    id: 'scenario_refund',
+    title: 'Return & Merchant Refund',
+    description: 'Customer returns incompatible item and merchant issues a full refund of ₦15,000.',
+    text: `[15/10/2026, 09:30:00] Kabiru Sanusi: Chidi good morning. That 65W GaN adapter I bought yesterday for ₦15,000 no fit my Dell laptop charging pin.
+[15/10/2026, 09:35:00] Chidubem Okafor: Good morning Kabiru. Bring it back to the shop in Computer Village with the box. If no scratch, I will refund you or give you replacement.
+[15/10/2026, 11:10:00] Kabiru Sanusi: I just dropped it with your boy at the counter.
+[15/10/2026, 11:15:00] Chidubem Okafor: Seen bro, adapter is intact. I have just refunded your ₦15,000 back to your Moniepoint account. Check your alert.
+[15/10/2026, 11:17:00] Kabiru Sanusi: 15k refund received. Thanks for good customer service bro.`,
+  },
+  {
+    id: 'scenario_casual_chitchat',
+    title: 'Casual Chat & Non-Converting Inquiries',
+    description: 'Pleasantries and price inquiries where no deal was made. System must extract 0 transactions.',
+    text: `[18/10/2026, 08:20:00] Folake Johnson: Good morning Chidi! Happy Sunday to you and family.
+[18/10/2026, 08:25:00] Chidubem Okafor: Good morning madam Folake! Thank you, wish you a blessed week ahead.
+[18/10/2026, 17:10:00] Folake Johnson: Please do you sell PlayStation 5 console?
+[18/10/2026, 17:15:00] Chidubem Okafor: Yes ma, the Slim Disc Edition is ₦780,000 currently.
+[18/10/2026, 17:22:00] Folake Johnson: Wow prices have really gone up! That is way above my budget for nephew's birthday. Let me think about it.
+[18/10/2026, 17:25:00] Chidubem Okafor: No problem at all ma, whenever you are ready.`,
+  },
+];
+
+export function getFreshDemoConversations(): Conversation[] {
+  return DEMO_CONVERSATIONS.map((conv, idx) => {
+    const { txDate } = getDynamicTxDate(idx);
+    return {
+      ...conv,
+      date: txDate,
+    };
+  });
+}
+
+export function getFreshDemoCustomers(): Customer[] {
+  return DEMO_CUSTOMERS.map((cust, idx) => {
+    const { txDate } = getDynamicTxDate(idx);
+    return {
+      ...cust,
+      lastTransactionDate: txDate,
+    };
+  });
+}

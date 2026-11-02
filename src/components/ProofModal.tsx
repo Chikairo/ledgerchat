@@ -46,27 +46,27 @@ export const ProofModal: React.FC<ProofModalProps> = ({
     if (!ev) {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
-          <MessageSquare className="w-3.5 h-3.5" /> Customer Claim Only
+          <MessageSquare className="w-3.5 h-3.5" /> Customer Stated in Chat Only
         </span>
       );
     }
     if (ev.type === 'receipt_image') {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-          <Eye className="w-3.5 h-3.5" /> Bank Receipt Screenshot Supplied
+          <Eye className="w-3.5 h-3.5" /> Bank Receipt Screenshot Attached
         </span>
       );
     }
     if (ev.type === 'bank_sms') {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-          <Building2 className="w-3.5 h-3.5" /> Bank SMS Alert in Chat
+          <Building2 className="w-3.5 h-3.5" /> Bank Alert Message in Chat
         </span>
       );
     }
     return (
       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
-        <MessageSquare className="w-3.5 h-3.5" /> WhatsApp Message Evidence
+        <MessageSquare className="w-3.5 h-3.5" /> WhatsApp Chat Evidence
       </span>
     );
   };
@@ -78,21 +78,22 @@ export const ProofModal: React.FC<ProofModalProps> = ({
         return (
           <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-[#168653] text-xs font-bold">
             <CheckCircle2 className="w-4 h-4" />
-            <span>Merchant Confirmed Paid</span>
+            <span>Confirmed Paid (Alert Received)</span>
           </div>
         );
       case 'partially_paid':
         return (
           <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-50 border border-amber-200 text-[#E9A23B] text-xs font-bold">
             <AlertTriangle className="w-4 h-4" />
-            <span>Partially Paid (₦{transaction.outstandingAmount.toLocaleString()} Owed)</span>
+            <span>Part Payment (Owes ₦{transaction.outstandingAmount.toLocaleString()})</span>
           </div>
         );
       case 'needs_review':
+      case 'payment_claimed':
         return (
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-rose-50 border border-rose-200 text-[#D94C4C] text-xs font-bold">
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 text-xs font-bold">
             <AlertTriangle className="w-4 h-4" />
-            <span>Needs Review</span>
+            <span>Customer Claims Paid (Check Alert)</span>
           </div>
         );
       default:
@@ -113,19 +114,19 @@ export const ProofModal: React.FC<ProofModalProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-base font-bold text-slate-900">
-                Payment Evidence & Verification
+                Bank Receipt & WhatsApp Proof
               </h3>
               <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
                 {transaction.id}
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Review original chat context and supporting payment proof for {transaction.customerName}
+              Check customer's payment screenshot and original WhatsApp messages for {transaction.customerName}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -136,11 +137,11 @@ export const ProofModal: React.FC<ProofModalProps> = ({
           {/* Status & Distinction Notice */}
           <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
             <div>
-              <span className="text-[11px] text-slate-500 block">Verification Classification</span>
+              <span className="text-[11px] text-slate-500 block font-semibold">Proof Attached</span>
               <div className="mt-1">{getEvidenceTypeBadge(primaryEvidence)}</div>
             </div>
             <div>
-              <span className="text-[11px] text-slate-500 block">Current Ledger Status</span>
+              <span className="text-[11px] text-slate-500 block font-semibold">Payment Status</span>
               <div className="mt-1">{getVerificationStatusBadge(transaction.status)}</div>
             </div>
           </div>
@@ -149,7 +150,7 @@ export const ProofModal: React.FC<ProofModalProps> = ({
           <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200 text-xs text-amber-900 flex gap-2.5">
             <AlertTriangle className="w-4 h-4 text-[#E9A23B] shrink-0 mt-0.5" />
             <p className="text-[11px] leading-relaxed">
-              <strong>Merchant Verification Standard:</strong> An AI extraction or customer screenshot indicates claimed payment, but is never marked as verified revenue until you confirm the actual funds in your bank account statement.
+              <strong>Check Your Bank App First:</strong> Customer saying "I don send am" or uploading a screenshot is not confirmed money in hand until you see the alert drop in your GTBank, OPay, Moniepoint, or Zenith account.
             </p>
           </div>
 
@@ -315,11 +316,11 @@ export const ProofModal: React.FC<ProofModalProps> = ({
           {/* Merchant Decision & Review Controls */}
           <div className="border-t border-slate-200 pt-4 space-y-3">
             <label className="block text-xs font-semibold text-slate-700">
-              Merchant Notes & Decision:
+              Your Verification Note (Optional):
             </label>
             <input
               type="text"
-              placeholder="e.g. Checked GTBank app, alert confirmed at 16:15"
+              placeholder="e.g. Alert saw on OPay app, or Waiting for Moniepoint confirmation"
               value={merchantNote}
               onChange={(e) => setMerchantNote(e.target.value)}
               className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#145C42]"
@@ -331,10 +332,10 @@ export const ProofModal: React.FC<ProofModalProps> = ({
                   onUpdateStatus(transaction.id, 'completed', 'merchant_confirmed', merchantNote);
                   onClose();
                 }}
-                className="flex-1 min-w-[140px] flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-[#168653] hover:bg-[#145C42] text-white font-semibold text-xs transition-colors cursor-pointer"
+                className="flex-1 min-w-[140px] flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-[#168653] hover:bg-[#145C42] text-white font-bold text-xs transition-colors cursor-pointer shadow-xs"
               >
                 <CheckCircle2 className="w-4 h-4" />
-                Confirm Payment in Full
+                Yes, I Saw Alert (Mark Paid)
               </button>
 
               <button
@@ -342,10 +343,10 @@ export const ProofModal: React.FC<ProofModalProps> = ({
                   onUpdateStatus(transaction.id, 'needs_review', 'customer_claimed', merchantNote);
                   onClose();
                 }}
-                className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs transition-colors cursor-pointer"
+                className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs transition-colors cursor-pointer shadow-xs"
               >
                 <AlertTriangle className="w-4 h-4" />
-                Flag for Follow-up
+                No Alert Yet (Needs Check)
               </button>
 
               <button
@@ -356,7 +357,7 @@ export const ProofModal: React.FC<ProofModalProps> = ({
                 className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 font-semibold text-xs transition-colors cursor-pointer"
               >
                 <XCircle className="w-4 h-4" />
-                Reject / Cancel Order
+                Cancel Order
               </button>
             </div>
           </div>

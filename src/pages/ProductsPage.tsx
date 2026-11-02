@@ -51,16 +51,31 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
     };
   }, [products]);
 
+  const [productSortTab, setProductSortTab] = useState<'all' | 'units' | 'revenue' | 'inquiries'>('all');
+
   // Filtered products
   const filteredProducts = useMemo(() => {
-    if (!searchQuery.trim()) return products;
-    const q = searchQuery.toLowerCase();
-    return products.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.category?.toLowerCase().includes(q)
-    );
-  }, [products, searchQuery]);
+    let list = [...products];
+
+    if (productSortTab === 'units') {
+      list.sort((a, b) => b.unitsSold - a.unitsSold);
+    } else if (productSortTab === 'revenue') {
+      list.sort((a, b) => b.totalSalesValue - a.totalSalesValue);
+    } else if (productSortTab === 'inquiries') {
+      list.sort((a, b) => b.inquiryCount - a.inquiryCount);
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.category?.toLowerCase().includes(q)
+      );
+    }
+
+    return list;
+  }, [products, productSortTab, searchQuery]);
 
   // Selected product details
   const selectedProduct = useMemo(() => {
@@ -85,9 +100,9 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
     <div className="space-y-6 animate-in fade-in duration-150">
       {/* Title */}
       <div>
-        <h1 className="text-2xl font-extrabold text-[#19251F] tracking-tight">Product Intelligence</h1>
+        <h1 className="text-2xl font-extrabold text-[#19251F] tracking-tight">Products & Stock</h1>
         <p className="text-xs text-[#718078] mt-0.5">
-          AI tracks what products customers inquire about on WhatsApp vs. what actually converts into confirmed revenue.
+          See which items sell fastest, which bring in the most money, and what customers ask about most on WhatsApp.
         </p>
       </div>
 
@@ -95,44 +110,53 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
       <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 text-xs text-emerald-950 flex items-start gap-2.5">
         <Tag className="w-4 h-4 text-[#145C42] shrink-0 mt-0.5" />
         <div className="leading-relaxed">
-          <strong>Conversion Rule:</strong> Best-selling metrics calculate solely from confirmed delivered sales, not informal inquiries. Inquiries show demand potential; units sold reflect settled business.
+          <strong>Important Tip:</strong> Inquiries show what customers asked for in chat. But we only count an item as "Sold" when the customer actually agreed and ordered it!
         </div>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-          <span className="text-xs font-semibold text-slate-500 block">Identified Items</span>
+          <span className="text-xs font-semibold text-slate-500 block">Total Items in Shop</span>
           <div className="text-2xl font-extrabold text-[#19251F] mt-1">{summary.totalProducts}</div>
-          <span className="text-[11px] text-slate-400 block mt-0.5">Discovered in chats</span>
+          <span className="text-[11px] text-slate-400 block mt-0.5">Found in your chats</span>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-          <span className="text-xs font-semibold text-emerald-800 block">Best Seller (Volume)</span>
+        <div
+          onClick={() => setProductSortTab('units')}
+          className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs cursor-pointer hover:border-[#145C42] transition-colors"
+        >
+          <span className="text-xs font-bold text-emerald-900 block">Sold The Most (Volume)</span>
           <div className="text-sm font-extrabold text-slate-900 mt-1 truncate">
             {summary.bestSelling ? summary.bestSelling.name : 'N/A'}
           </div>
-          <span className="text-[11px] text-[#168653] font-semibold block mt-0.5">
+          <span className="text-[11px] text-[#168653] font-bold block mt-0.5">
             {summary.bestSelling ? `${summary.bestSelling.unitsSold} units confirmed sold` : ''}
           </span>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-          <span className="text-xs font-semibold text-slate-500 block">Highest Revenue Item</span>
+        <div
+          onClick={() => setProductSortTab('revenue')}
+          className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs cursor-pointer hover:border-[#145C42] transition-colors"
+        >
+          <span className="text-xs font-bold text-slate-700 block">Brought Most Money</span>
           <div className="text-sm font-extrabold text-slate-900 mt-1 truncate">
             {summary.highestRevenue ? summary.highestRevenue.name : 'N/A'}
           </div>
-          <span className="text-[11px] text-[#145C42] font-semibold block mt-0.5">
+          <span className="text-[11px] text-[#145C42] font-bold block mt-0.5">
             ₦{summary.highestRevenue ? summary.highestRevenue.totalSalesValue.toLocaleString() : 0}
           </span>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-          <span className="text-xs font-semibold text-amber-800 block">Most Inquired Item</span>
+        <div
+          onClick={() => setProductSortTab('inquiries')}
+          className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs cursor-pointer hover:border-[#145C42] transition-colors"
+        >
+          <span className="text-xs font-bold text-amber-900 block">Most Inquired (Demand)</span>
           <div className="text-sm font-extrabold text-slate-900 mt-1 truncate">
             {summary.mostRequested ? summary.mostRequested.name : 'N/A'}
           </div>
-          <span className="text-[11px] text-amber-700 font-semibold block mt-0.5">
+          <span className="text-[11px] text-amber-700 font-bold block mt-0.5">
             {summary.mostRequested ? `${summary.mostRequested.inquiryCount} customer chats` : ''}
           </span>
         </div>
@@ -141,8 +165,52 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
       {/* Main Grid: Products Table and Detail Drawer */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden flex flex-col">
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-3">
-            <div className="relative flex-1">
+          {/* Quick Sort Tabs and Search */}
+          <div className="p-4 border-b border-slate-100 space-y-3">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              <button
+                onClick={() => setProductSortTab('all')}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-xl whitespace-nowrap transition-colors cursor-pointer ${
+                  productSortTab === 'all'
+                    ? 'bg-[#145C42] text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                All Products ({products.length})
+              </button>
+              <button
+                onClick={() => setProductSortTab('units')}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-xl whitespace-nowrap transition-colors cursor-pointer ${
+                  productSortTab === 'units'
+                    ? 'bg-[#145C42] text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Fastest Selling (Volume)
+              </button>
+              <button
+                onClick={() => setProductSortTab('revenue')}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-xl whitespace-nowrap transition-colors cursor-pointer ${
+                  productSortTab === 'revenue'
+                    ? 'bg-[#145C42] text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Brought Most Money
+              </button>
+              <button
+                onClick={() => setProductSortTab('inquiries')}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-xl whitespace-nowrap transition-colors cursor-pointer ${
+                  productSortTab === 'inquiries'
+                    ? 'bg-[#145C42] text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Asked About Most
+              </button>
+            </div>
+
+            <div className="relative">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
@@ -177,7 +245,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                         </span>
                       </div>
                       <div className="flex items-center gap-3 text-[11px] text-slate-500 mt-1">
-                        <span>Units Sold: <strong className="text-slate-800">{prod.unitsSold}</strong></span>
+                        <span>Confirmed Sold: <strong className="text-slate-800">{prod.unitsSold} units</strong></span>
                         <span>Avg Price: <strong className="text-slate-800">₦{prod.averageSellingPrice.toLocaleString()}</strong></span>
                       </div>
                     </div>
@@ -190,7 +258,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                     <div className="flex items-center justify-end gap-1 mt-0.5">
                       {getTrendIcon(prod.trend)}
                       <span className="text-[10px] text-slate-400">
-                        {prod.inquiryCount} inquiries
+                        {prod.inquiryCount} chat inquiries
                       </span>
                     </div>
                   </div>

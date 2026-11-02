@@ -13,6 +13,7 @@ import {
   ChevronRight,
   ShieldCheck,
   AlertTriangle,
+  Code2,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -31,18 +32,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
   pendingReviewsCount = 0,
 }) => {
   const navItems = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+    { id: 'overview', label: 'Shop Dashboard', icon: LayoutDashboard },
     {
       id: 'transactions',
-      label: 'Transactions',
+      label: 'Sales & Payments',
       icon: Receipt,
       badge: pendingReviewsCount > 0 ? pendingReviewsCount : undefined,
     },
-    { id: 'customers', label: 'Customers', icon: Users },
-    { id: 'products', label: 'Products', icon: Package },
-    { id: 'insights', label: 'Business Insights', icon: TrendingUp },
-    { id: 'conversations', label: 'Conversations', icon: MessageSquare },
-    { id: 'reports', label: 'Reports', icon: FileBarChart },
+    { id: 'customers', label: 'Customers & Debts', icon: Users },
+    { id: 'products', label: 'Products & Stock', icon: Package },
+    { id: 'insights', label: 'Business Advice', icon: TrendingUp },
+    { id: 'conversations', label: 'WhatsApp Chats', icon: MessageSquare },
+    { id: 'reports', label: 'Financial Statements', icon: FileBarChart },
+    { id: 'developer', label: 'Developer & API', icon: Code2 },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 

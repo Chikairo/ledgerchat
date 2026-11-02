@@ -24,6 +24,8 @@ interface NavbarProps {
   activeMode: 'demo' | 'real';
   onToggleMode: (mode: 'demo' | 'real') => void;
   onResetDemo: () => void;
+  onOpenAuthModal?: () => void;
+  onNavigateToHome?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -34,6 +36,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   activeMode,
   onToggleMode,
   onResetDemo,
+  onOpenAuthModal,
+  onNavigateToHome,
 }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -45,13 +49,21 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="bg-[#103E30] text-emerald-100 text-xs py-1.5 px-4 flex items-center justify-between">
           <div className="flex items-center gap-2 max-w-3xl overflow-hidden text-ellipsis whitespace-nowrap">
             <span className="bg-[#168653] text-white font-semibold px-2 py-0.5 rounded-full text-[10px] tracking-wide uppercase">
-              Demo Business
+              Demo Environment
             </span>
             <span>
-              Exploring sample data for <strong>{profile.name}</strong> (Lagos, Nigeria). No real customer data affected.
+              Exploring sample records for <strong>{profile.name}</strong> (Lagos, Nigeria). No real customer data affected.
             </span>
           </div>
           <div className="flex items-center gap-3 shrink-0">
+            {onNavigateToHome && (
+              <button
+                onClick={onNavigateToHome}
+                className="hover:text-white flex items-center gap-1 text-[11px] text-emerald-200 underline underline-offset-2 transition-colors cursor-pointer"
+              >
+                ← Back to Website
+              </button>
+            )}
             <button
               onClick={onResetDemo}
               className="hover:text-white flex items-center gap-1 text-[11px] underline underline-offset-2 transition-colors cursor-pointer"
@@ -64,7 +76,37 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={() => onToggleMode('real')}
               className="bg-white/15 hover:bg-white/25 text-white text-[11px] font-medium px-2.5 py-0.5 rounded-md transition-colors cursor-pointer"
             >
-              Switch to My Business
+              Switch to Live Merchant App
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Live Mode Banner */}
+      {activeMode === 'real' && (
+        <div className="bg-[#145C42] text-emerald-100 text-xs py-1.5 px-4 flex items-center justify-between">
+          <div className="flex items-center gap-2 max-w-3xl overflow-hidden text-ellipsis whitespace-nowrap">
+            <span className="bg-emerald-300 text-[#103E30] font-bold px-2 py-0.5 rounded-full text-[10px] tracking-wide uppercase">
+              Live Production Ledger
+            </span>
+            <span>
+              Active business: <strong>{profile.name}</strong> ({profile.currency}). Isolated private merchant storage.
+            </span>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            {onNavigateToHome && (
+              <button
+                onClick={onNavigateToHome}
+                className="hover:text-white flex items-center gap-1 text-[11px] text-emerald-200 underline underline-offset-2 transition-colors cursor-pointer"
+              >
+                ← Back to Website
+              </button>
+            )}
+            <button
+              onClick={() => onToggleMode('demo')}
+              className="hover:text-white flex items-center gap-1 text-[11px] underline underline-offset-2 transition-colors cursor-pointer"
+            >
+              Switch to Chidi Electronics Demo
             </button>
           </div>
         </div>
@@ -83,12 +125,12 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="font-bold text-lg text-[#19251F] tracking-tight">LedgerChat</span>
-                <span className="hidden sm:inline-block text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-[#E8F4ED] text-[#145C42]">
-                  Fintech
+                <span className="hidden sm:inline-block text-[10px] font-bold px-2 py-0.5 rounded bg-[#E8F4ED] text-[#145C42]">
+                  Shop Ledger
                 </span>
               </div>
               <p className="text-[11px] text-[#718078] hidden md:block">
-                Your conversations. Your business.
+                Turn WhatsApp chats into clear sales records
               </p>
             </div>
           </div>
@@ -110,16 +152,16 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Period Selector */}
           <div className="relative">
             <select
-              aria-label="Reporting Period"
+              aria-label="Filter records by date"
               value={selectedPeriod}
               onChange={(e) => onPeriodChange(e.target.value)}
-              className="text-xs font-medium bg-slate-50 hover:bg-slate-100 text-[#19251F] border border-slate-200 rounded-lg px-2.5 py-1.5 pr-7 focus:outline-none focus:ring-2 focus:ring-[#145C42]/20 cursor-pointer appearance-none transition-colors"
+              className="text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-[#19251F] border border-slate-200 rounded-lg px-2.5 py-1.5 pr-7 focus:outline-none focus:ring-2 focus:ring-[#145C42]/20 cursor-pointer appearance-none transition-colors"
             >
-              <option value="today">Today</option>
+              <option value="today">Today's Sales</option>
               <option value="this_week">This Week</option>
               <option value="this_month">This Month</option>
-              <option value="this_year">This Year</option>
-              <option value="all_time">All Time</option>
+              <option value="this_year">This Entire Year</option>
+              <option value="all_time">All Records Ever</option>
             </select>
             <ChevronDown className="w-3.5 h-3.5 text-slate-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
@@ -130,7 +172,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="hidden sm:flex items-center gap-1.5 text-xs font-semibold bg-[#145C42] hover:bg-[#103E30] text-white px-3 py-1.5 rounded-lg shadow-xs transition-colors cursor-pointer"
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Import Chat</span>
+            <span>Add WhatsApp Chat</span>
           </button>
 
           {/* Notifications Dropdown */}
@@ -244,6 +286,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                 )}
 
                 <div className="border-t border-slate-100 mt-1 pt-1">
+                  {onNavigateToHome && (
+                    <button
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        onNavigateToHome();
+                      }}
+                      className="w-full text-left px-3 py-2 text-xs text-[#145C42] hover:bg-emerald-50 flex items-center gap-2 font-medium cursor-pointer"
+                    >
+                      <Store className="w-3.5 h-3.5 text-[#145C42]" />
+                      Back to Public Website
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       setShowProfileMenu(false);

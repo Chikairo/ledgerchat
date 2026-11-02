@@ -78,20 +78,20 @@ export const TransactionDrawer: React.FC<TransactionDrawerProps> = ({
           <div className="flex-1 overflow-y-auto p-5 space-y-6">
             {/* Amount Summary Card */}
             <div className="p-4 rounded-2xl bg-gradient-to-br from-[#103E30] to-[#145C42] text-white shadow-md">
-              <span className="text-xs text-emerald-200 font-medium">Agreed Transaction Total</span>
+              <span className="text-xs text-emerald-200 font-medium">Agreed Order Amount</span>
               <div className="text-2xl font-bold mt-0.5">
                 ₦{transaction.agreedAmount.toLocaleString()}
               </div>
 
               <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-emerald-700/50 text-xs">
                 <div>
-                  <span className="text-emerald-300 block text-[11px]">Amount Collected</span>
+                  <span className="text-emerald-300 block text-[11px]">Money Received</span>
                   <span className="font-semibold text-white">
                     ₦{transaction.amountPaid.toLocaleString()}
                   </span>
                 </div>
                 <div>
-                  <span className="text-emerald-300 block text-[11px]">Outstanding Balance</span>
+                  <span className="text-emerald-300 block text-[11px]">Customer Still Owes</span>
                   <span
                     className={`font-semibold ${
                       transaction.outstandingAmount > 0 ? 'text-amber-300' : 'text-emerald-200'
@@ -106,11 +106,11 @@ export const TransactionDrawer: React.FC<TransactionDrawerProps> = ({
             {/* Quick Proof Action */}
             <button
               onClick={() => onOpenProofModal(transaction)}
-              className="w-full flex items-center justify-between p-3.5 rounded-xl bg-[#E8F4ED] hover:bg-emerald-100 border border-emerald-200 text-[#145C42] font-semibold text-xs transition-colors cursor-pointer group"
+              className="w-full flex items-center justify-between p-3.5 rounded-xl bg-[#E8F4ED] hover:bg-emerald-100 border border-emerald-200 text-[#145C42] font-bold text-xs transition-colors cursor-pointer group"
             >
               <div className="flex items-center gap-2">
                 <Eye className="w-4 h-4 text-[#145C42]" />
-                <span>View Payment Evidence & Proof</span>
+                <span>See Bank Receipt & WhatsApp Proof</span>
               </div>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </button>

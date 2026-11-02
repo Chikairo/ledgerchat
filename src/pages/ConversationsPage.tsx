@@ -70,9 +70,9 @@ export const ConversationsPage: React.FC<ConversationsPageProps> = ({
       {/* Title */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-extrabold text-[#19251F] tracking-tight">Conversations</h1>
+          <h1 className="text-2xl font-extrabold text-[#19251F] tracking-tight">WhatsApp Chats</h1>
           <p className="text-xs text-[#718078] mt-0.5">
-            Retrieve and search original WhatsApp chats supporting your audited transactions and payment claims.
+            Read through your original customer WhatsApp conversations and see the exact sales and payments extracted from each chat.
           </p>
         </div>
 
@@ -81,7 +81,7 @@ export const ConversationsPage: React.FC<ConversationsPageProps> = ({
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#145C42] text-white text-xs font-semibold hover:bg-[#103E30] transition-colors cursor-pointer shadow-xs"
         >
           <Sparkles className="w-3.5 h-3.5" />
-          Import Another WhatsApp Chat
+          Add WhatsApp Chat
         </button>
       </div>
 

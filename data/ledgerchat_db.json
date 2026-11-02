@@ -1,0 +1,88 @@
+{
+  "users": [
+    {
+      "id": "usr_cac94b2aeca7",
+      "email": "testpilot@ledgerchat.com",
+      "passwordHash": "f084d519ceef44e84e15bae1ba7f9893af92ceed9bc4468889ab81ffd89c316b74ab41a285cbea1cde147b79631568d98bf26b4773e48b40a767f6c207435369",
+      "salt": "426d595657b14041fa2bc3f5359c5815",
+      "name": "Chukwuemeka Obi",
+      "businessId": "biz_082a3cacbfd0",
+      "createdAt": "2026-11-02T14:31:14.633Z"
+    },
+    {
+      "id": "usr_add7e48e96c1",
+      "email": "test_merchant@ledgerchat.ng",
+      "passwordHash": "05190366948b099505c65f5f6e43a4b3c9c8fcc09a09a018192ce0a71da15138f3dddc6c6f0171a5e4ea92d9f6a55fcfd527e2aae589f946cb823da82a90739a",
+      "salt": "48bdfd2557b1683bfcccc0ef5af96bde",
+      "name": "Emeka Okafor",
+      "businessId": "biz_99b1bfffcf5c",
+      "createdAt": "2026-11-02T15:20:26.884Z"
+    }
+  ],
+  "businesses": [
+    {
+      "id": "biz_082a3cacbfd0",
+      "name": "Obi Solar & Power Ltd",
+      "ownerName": "Chukwuemeka Obi",
+      "category": "General Retail",
+      "country": "Nigeria",
+      "currency": "NGN",
+      "currencySymbol": "₦",
+      "reconciliationFrequency": "weekly",
+      "reminderDay": "Monday",
+      "reminderTime": "09:00",
+      "createdAt": "2026-11-02T14:31:14.631Z",
+      "whatsappConfig": {
+        "status": "not_configured"
+      }
+    },
+    {
+      "id": "biz_99b1bfffcf5c",
+      "name": "Emeka Solar Hub",
+      "ownerName": "Emeka Okafor",
+      "category": "General Retail",
+      "country": "Nigeria",
+      "currency": "NGN",
+      "currencySymbol": "₦",
+      "reconciliationFrequency": "weekly",
+      "reminderDay": "Monday",
+      "reminderTime": "09:00",
+      "createdAt": "2026-11-02T15:20:26.882Z",
+      "whatsappConfig": {
+        "status": "not_configured"
+      }
+    }
+  ],
+  "apiKeys": [
+    {
+      "id": "key_5a280fbbf5fc",
+      "businessId": "biz_082a3cacbfd0",
+      "name": "Inventory Sync API",
+      "keyHash": "c1fb7894ebc1eabf263c05ce1453900b328614597fc3ff6b514473be3a94cee1",
+      "prefix": "lchat_live_1e21...1e20",
+      "createdAt": "2026-11-02T14:31:27.234Z",
+      "status": "active",
+      "lastUsedAt": "2026-11-02T14:31:34.231Z"
+    }
+  ],
+  "transactions": [],
+  "customers": [],
+  "products": [],
+  "conversations": [],
+  "ingestJobs": [],
+  "webhooks": [],
+  "sessions": [
+    {
+      "token": "lchat_sess_018d47af3e4bad558cbe244d67f8868474593792038041f2",
+      "userId": "usr_cac94b2aeca7",
+      "businessId": "biz_082a3cacbfd0",
+      "expiresAt": "2026-12-02T14:31:14.633Z"
+    },
+    {
+      "token": "lchat_sess_e8c7938e55ce3e3f3e725878ea5e79407c0e33760f012d2a",
+      "userId": "usr_add7e48e96c1",
+      "businessId": "biz_99b1bfffcf5c",
+      "expiresAt": "2026-12-02T15:20:26.884Z"
+    }
+  ]
+}

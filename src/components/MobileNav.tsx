@@ -12,6 +12,7 @@ import {
   FileBarChart,
   Settings,
   Sparkles,
+  Code2,
 } from 'lucide-react';
 
 interface MobileNavProps {
@@ -28,23 +29,24 @@ export const MobileNav: React.FC<MobileNavProps> = ({
   const [showMoreMenu, setShowMoreMenu] = useState(false);
 
   const mainItems = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+    { id: 'overview', label: 'Shop Home', icon: LayoutDashboard },
     {
       id: 'transactions',
-      label: 'Transactions',
+      label: 'Sales',
       icon: Receipt,
       badge: pendingReviewsCount > 0 ? pendingReviewsCount : undefined,
     },
-    { id: 'import', label: 'Import', icon: UploadCloud, isCenter: true },
+    { id: 'import', label: 'Add Chat', icon: UploadCloud, isCenter: true },
     { id: 'customers', label: 'Customers', icon: Users },
   ];
 
   const moreItems = [
-    { id: 'products', label: 'Products & Inventory', icon: Package },
-    { id: 'insights', label: 'Business Insights', icon: TrendingUp },
-    { id: 'conversations', label: 'WhatsApp Chats', icon: MessageSquare },
-    { id: 'reports', label: 'Reports & Exports', icon: FileBarChart },
-    { id: 'settings', label: 'Settings & Security', icon: Settings },
+    { id: 'products', label: 'Products & Stock', icon: Package },
+    { id: 'insights', label: 'Business Advice', icon: TrendingUp },
+    { id: 'conversations', label: 'All Chats', icon: MessageSquare },
+    { id: 'reports', label: 'Statements & Reports', icon: FileBarChart },
+    { id: 'developer', label: 'Developer & API', icon: Code2 },
+    { id: 'settings', label: 'Shop Profile', icon: Settings },
   ];
 
   return (

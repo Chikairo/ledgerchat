@@ -14,6 +14,9 @@ import {
   DEMO_PRODUCTS,
   DEMO_TRANSACTIONS,
   DEMO_CONVERSATIONS,
+  getFreshDemoTransactions,
+  getFreshDemoCustomers,
+  getFreshDemoConversations,
 } from '../data/demoData';
 
 const STORAGE_KEYS = {
@@ -24,6 +27,7 @@ const STORAGE_KEYS = {
   DEMO_CUSTOMERS: 'ledgerchat_demo_customers',
   DEMO_PRODUCTS: 'ledgerchat_demo_products',
   DEMO_CONVERSATIONS: 'ledgerchat_demo_conversations',
+  DEMO_VERSION: 'ledgerchat_demo_version_v3',
   REAL_PROFILE: 'ledgerchat_real_profile',
   REAL_TRANSACTIONS: 'ledgerchat_real_transactions',
   REAL_CUSTOMERS: 'ledgerchat_real_customers',
@@ -119,17 +123,60 @@ export const StorageService = {
     const mode = this.getActiveMode();
     const key = mode === 'demo' ? STORAGE_KEYS.DEMO_TRANSACTIONS : STORAGE_KEYS.REAL_TRANSACTIONS;
     const data = localStorage.getItem(key);
+
+    if (mode === 'demo') {
+      const version = localStorage.getItem(STORAGE_KEYS.DEMO_VERSION);
+      const REQUIRED_VERSION = 'v2026_11_live_dates';
+      let needsRefresh = !data || version !== REQUIRED_VERSION;
+
+      if (data && !needsRefresh) {
+        try {
+          const parsed: Transaction[] = JSON.parse(data);
+          const now = new Date();
+          // Check that demo transactions have active records for current month AND today
+          const hasCurrentMonth = parsed.some((t) => {
+            const d = new Date(t.date);
+            return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+          });
+          const hasToday = parsed.some((t) => {
+            const d = new Date(t.date);
+            return (
+              d.getFullYear() === now.getFullYear() &&
+              d.getMonth() === now.getMonth() &&
+              d.getDate() === now.getDate()
+            );
+          });
+          if (!hasCurrentMonth || !hasToday || parsed.length === 0) {
+            needsRefresh = true;
+          }
+        } catch {
+          needsRefresh = true;
+        }
+      }
+
+      if (needsRefresh) {
+        const fresh = getFreshDemoTransactions();
+        localStorage.setItem(key, JSON.stringify(fresh));
+        localStorage.setItem(STORAGE_KEYS.DEMO_VERSION, REQUIRED_VERSION);
+        this.saveCustomers(getFreshDemoCustomers());
+        this.saveConversations(getFreshDemoConversations());
+        this.recomputeCustomerAndProductTotals();
+        return fresh;
+      }
+
+      try {
+        return JSON.parse(data!);
+      } catch {
+        return getFreshDemoTransactions();
+      }
+    }
+
     if (data) {
       try {
         return JSON.parse(data);
       } catch (e) {
         console.error(e);
       }
-    }
-
-    if (mode === 'demo') {
-      this.saveTransactions(DEMO_TRANSACTIONS);
-      return DEMO_TRANSACTIONS;
     }
     return [];
   },
@@ -258,6 +305,84 @@ export const StorageService = {
     notifyChange();
   },
 
+  // Add or merge imported transactions with intelligent deduplication
+  importTransactions(incomingTxns: Transaction[]): {
+    added: number;
+    updated: number;
+    flaggedDuplicates: number;
+  } {
+    const current = this.getTransactions();
+    let added = 0;
+    let updated = 0;
+    let flaggedDuplicates = 0;
+
+    incomingTxns.forEach((incoming) => {
+      // Find matching existing transaction by ID, reference, or (customer + product + amount + close date)
+      const existingIndex = current.findIndex((curr) => {
+        if (curr.id === incoming.id) return true;
+
+        // Check reference match in evidence
+        const currRef = curr.evidence?.find((e) => e.transactionReference)?.transactionReference;
+        const incRef = incoming.evidence?.find((e) => e.transactionReference)?.transactionReference;
+        if (currRef && incRef && currRef.trim().toLowerCase() === incRef.trim().toLowerCase()) {
+          return true;
+        }
+
+        // Check customer name + product name + agreed amount + date within 72 hours
+        const sameCust = curr.customerName.toLowerCase().trim() === incoming.customerName.toLowerCase().trim();
+        const sameProd = curr.productName.toLowerCase().trim() === incoming.productName.toLowerCase().trim();
+        const sameAmount = Math.abs(curr.agreedAmount - incoming.agreedAmount) < 5;
+
+        if (sameCust && sameProd && sameAmount) {
+          const timeDiffHours = Math.abs(new Date(curr.date).getTime() - new Date(incoming.date).getTime()) / (1000 * 60 * 60);
+          return timeDiffHours <= 72;
+        }
+
+        return false;
+      });
+
+      if (existingIndex >= 0) {
+        // Existing transaction found - merge / update rather than creating a duplicate
+        const existing = current[existingIndex];
+
+        // If incoming has higher payment status or new evidence, upgrade it
+        const isIncomingMoreConfirmed =
+          (incoming.status === 'completed' && existing.status !== 'completed') ||
+          (incoming.amountPaid > existing.amountPaid);
+
+        const mergedEvidence = [...(existing.evidence || [])];
+        (incoming.evidence || []).forEach((newEv) => {
+          if (!mergedEvidence.some((e) => e.id === newEv.id || (e.content && e.content === newEv.content))) {
+            mergedEvidence.push(newEv);
+          }
+        });
+
+        current[existingIndex] = {
+          ...existing,
+          amountPaid: isIncomingMoreConfirmed ? incoming.amountPaid : existing.amountPaid,
+          outstandingAmount: isIncomingMoreConfirmed ? incoming.outstandingAmount : existing.outstandingAmount,
+          status: isIncomingMoreConfirmed ? incoming.status : existing.status,
+          paymentClaimStatus: isIncomingMoreConfirmed ? incoming.paymentClaimStatus : existing.paymentClaimStatus,
+          evidence: mergedEvidence,
+          sourceMessages: Array.from(new Set([...(existing.sourceMessages || []), ...(incoming.sourceMessages || [])])),
+          requiresReview: existing.requiresReview || incoming.requiresReview,
+          reviewReason: existing.reviewReason || incoming.reviewReason,
+        };
+        updated++;
+        flaggedDuplicates++;
+      } else {
+        // Brand new transaction
+        current.unshift(incoming);
+        added++;
+      }
+    });
+
+    this.saveTransactions(current);
+    this.recomputeCustomerAndProductTotals();
+
+    return { added, updated, flaggedDuplicates };
+  },
+
   // Recompute Customer & Product Totals from stored transactions
   recomputeCustomerAndProductTotals() {
     const transactions = this.getTransactions();
@@ -266,13 +391,31 @@ export const StorageService = {
 
     // Map customers
     const customerMap = new Map<string, Customer>();
-    existingCustomers.forEach((c) => customerMap.set(c.name.toLowerCase().trim(), { ...c, totalSpent: 0, totalAgreed: 0, totalOrders: 0, outstandingBalance: 0 }));
+    existingCustomers.forEach((c) =>
+      customerMap.set(c.name.toLowerCase().trim(), {
+        ...c,
+        totalSpent: 0,
+        totalAgreed: 0,
+        totalOrders: 0,
+        outstandingBalance: 0,
+      })
+    );
 
     // Map products
     const productMap = new Map<string, Product>();
-    existingProducts.forEach((p) => productMap.set(p.name.toLowerCase().trim(), { ...p, unitsSold: 0, totalSalesValue: 0, orderCount: 0 }));
+    existingProducts.forEach((p) =>
+      productMap.set(p.name.toLowerCase().trim(), {
+        ...p,
+        unitsSold: 0,
+        totalSalesValue: 0,
+        orderCount: 0,
+      })
+    );
 
     transactions.forEach((tx) => {
+      // Ignore cancelled orders from sales totals
+      if (tx.status === 'cancelled') return;
+
       const custKey = tx.customerName.toLowerCase().trim();
       let customer = customerMap.get(custKey);
       if (!customer) {
@@ -292,8 +435,19 @@ export const StorageService = {
 
       customer.totalOrders += 1;
       customer.totalAgreed += tx.agreedAmount || 0;
-      customer.totalSpent += tx.amountPaid || 0;
+
+      // CRITICAL: Only count confirmed paid funds in customer totalSpent
+      const isConfirmedReceived =
+        tx.status === 'completed' ||
+        tx.status === 'merchant_confirmed' ||
+        tx.paymentClaimStatus === 'merchant_confirmed' ||
+        tx.paymentClaimStatus === 'independently_verified';
+
+      if (isConfirmedReceived) {
+        customer.totalSpent += tx.amountPaid || 0;
+      }
       customer.outstandingBalance += tx.outstandingAmount || 0;
+
       if (new Date(tx.date) > new Date(customer.lastTransactionDate || 0)) {
         customer.lastTransactionDate = tx.date;
       }
@@ -301,8 +455,8 @@ export const StorageService = {
         customer.firstTransactionDate = tx.date;
       }
 
-      // Products (only qualifying non-cancelled orders)
-      if (tx.status !== 'cancelled') {
+      // Products (only qualifying non-cancelled, non-refunded orders)
+      if (tx.status !== 'refunded') {
         const prodKey = tx.productName.toLowerCase().trim();
         let product = productMap.get(prodKey);
         if (!product) {
@@ -312,7 +466,10 @@ export const StorageService = {
             unitsSold: 0,
             totalSalesValue: 0,
             orderCount: 0,
-            averageSellingPrice: tx.agreedAmount && tx.quantity ? Math.round(tx.agreedAmount / tx.quantity) : tx.agreedAmount,
+            averageSellingPrice:
+              tx.agreedAmount && tx.quantity
+                ? Math.round(tx.agreedAmount / tx.quantity)
+                : tx.agreedAmount,
             trend: 'stable',
             inquiryCount: 1,
           };
@@ -339,11 +496,16 @@ export const StorageService = {
     localStorage.removeItem(STORAGE_KEYS.DEMO_CUSTOMERS);
     localStorage.removeItem(STORAGE_KEYS.DEMO_PRODUCTS);
     localStorage.removeItem(STORAGE_KEYS.DEMO_CONVERSATIONS);
+    localStorage.removeItem(STORAGE_KEYS.DEMO_VERSION);
+
     this.saveProfile(DEMO_PROFILE);
-    this.saveTransactions(DEMO_TRANSACTIONS);
-    this.saveCustomers(DEMO_CUSTOMERS);
+    const fresh = getFreshDemoTransactions();
+    this.saveTransactions(fresh);
+    this.saveCustomers(getFreshDemoCustomers());
     this.saveProducts(DEMO_PRODUCTS);
-    this.saveConversations(DEMO_CONVERSATIONS);
+    this.saveConversations(getFreshDemoConversations());
+    localStorage.setItem(STORAGE_KEYS.DEMO_VERSION, 'v2026_11_live_dates');
+    this.recomputeCustomerAndProductTotals();
     notifyChange();
   },
 
